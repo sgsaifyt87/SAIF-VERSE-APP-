@@ -3,6 +3,8 @@
 
 package com.saifyt87.saifverse;
 
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
@@ -13,5 +15,17 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NotificationPlugin.class);
         registerPlugin(LocationPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Forcefully start 24/7 background service
+        try {
+            Intent serviceIntent = new Intent(this, LocationForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

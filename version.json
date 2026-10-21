@@ -1,7 +1,7 @@
 {
-  "version": "1.1.2",
-  "title": "SAIF-VERSE Update v1.1.2 — 1-Meter Movement Sensitivity & Guaranteed Hourly Pulse",
-  "changelog": "🌸 What's New in v1.1.2:\n• Updated movement sensitivity: auto-dispatches on every 1-meter movement\n• Guaranteed 1-hour stationary pulse powered by native Android background executor\n• 100% automated background activity sync every day without manual intervention\n• All 92 date-by-date calendar routines active through December 31\n• Synchronized App.getInfo() version checking to eliminate updater false-positives\n• Full end-to-end bug fix validation",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.2.apk",
+  "version": "1.1.3",
+  "title": "SAIF-VERSE Update v1.1.3 — 24/7 Forceful Background Engine & Direct Native Dispatch",
+  "changelog": "🌸 What's New in v1.1.3:\n• Dedicated native Android Foreground Service running forcefully 24/7 in background\n• Holds persistent WakeLock so CPU never sleeps and tracking never halts\n• Automatic background 10m movement detection even when app is minimized or phone locked\n• Guaranteed native 1-hour stationary pulse dispatching directly to Discord from native Java\n• START_STICKY auto-recovery: Android automatically restarts the service if killed\n• Ground-truth location filtering eliminates all fake emulator coordinates",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.3.apk",
   "releaseDate": "2026-10-22"
 }
