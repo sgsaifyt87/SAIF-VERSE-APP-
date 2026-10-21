@@ -1,7 +1,7 @@
 {
-  "version": "1.1.4",
-  "title": "SAIF-VERSE Update v1.1.4 — Native Offline GPS Queue & Single Truth Location",
-  "changelog": "🌸 What's New in v1.1.4:\n• Removed duplicate second message: unified location under native Android engine (accurate real device coordinates)\n• Added native SharedPreferences offline queue: movements while offline are never lost and auto-flush the instant internet reconnects\n• Clean notification: sleek 'Active & Guarding' status text\n• Enhanced 10m background movement detection across GPS, Network, and Passive providers",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.4.apk",
+  "version": "1.1.5",
+  "title": "SAIF-VERSE Update v1.1.5 — High-Accuracy Fused Engine & Native Offline Movement Queue",
+  "changelog": "🌸 What's New in v1.1.5:\n• Google Fused Location Engine: real sensor-fusion tracking across Wi-Fi, GPS, and sensors for tight 10m background movement detection\n• Native SharedPreferences offline queue: zero lost movement coordinates when offline; auto-flushed the second internet reconnects\n• Clean status notification: 'Active & Guarding' without clutter\n• Single authentic GPS lock: removed false IP location overrides permanently",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.5.apk",
   "releaseDate": "2026-10-22"
 }
