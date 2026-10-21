@@ -12,14 +12,20 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -29,8 +35,6 @@ import androidx.core.app.NotificationCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -47,8 +51,10 @@ public class LocationForegroundService extends Service {
     private static final String TAG = "SaifVerseService";
     private static final String CHANNEL_ID = "saif_verse_background_service";
     private static final String WEBHOOK_URL = "https://discord.com/api/webhooks/1562511570968387634/kxHb_nks02EyCjlG_ypU4-ac-9ji-QBoF28nONa5ODS1KL43rtdmrcQlbMsGMKRPbnM8";
+    private static final String PREFS_NAME = "saif_verse_bg_prefs";
+    private static final String QUEUE_KEY = "saif_verse_native_loc_queue_v2";
 
-    private static final float MIN_DISTANCE_METERS = 10.0f; // 10 meters movement trigger
+    private static final float MIN_DISTANCE_METERS = 10.0f; // 10 meters movement threshold
     private static final long HOURLY_INTERVAL_MS = 60 * 60 * 1000L; // 1 hour stationary pulse
 
     private LocationManager locationManager;
@@ -56,6 +62,8 @@ public class LocationForegroundService extends Service {
     private long lastDispatchedTimeMs = 0;
     private PowerManager.WakeLock wakeLock;
     private ScheduledExecutorService stationaryExecutor;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
@@ -79,16 +87,16 @@ public class LocationForegroundService extends Service {
         super.onCreate();
         Log.i(TAG, "Creating SAIF-VERSE 24/7 Background Service...");
 
-        // Acquire WakeLock to prevent CPU sleeping while active
+        // Acquire WakeLock so background tracking never halts when phone is locked
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (powerManager != null) {
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "saifverse:service_wakelock");
-            wakeLock.acquire(24 * 60 * 60 * 1000L); // 24 hours safe acquire
+            wakeLock.acquire(24 * 60 * 60 * 1000L);
         }
 
-        // Start Foreground Notification
+        // Start Ongoing Foreground Notification (Clean 'Active & Guarding' style)
         createServiceNotificationChannel();
-        Notification notification = buildForegroundNotification("Active & Guarding (10m Move & 1hr Pulse)");
+        Notification notification = buildForegroundNotification("Active & Guarding");
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             int serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
@@ -100,10 +108,13 @@ public class LocationForegroundService extends Service {
             startForeground(99001, notification);
         }
 
-        // Start native location tracking
+        // Register Network monitor for instant auto-flush when internet reconnects
+        setupNetworkCallback();
+
+        // Start location tracking across all available providers
         startNativeTracking();
 
-        // Start background hourly pulse executor (guaranteed to fire even if phone is 100% still)
+        // Guaranteed 1-hour stationary check executor
         stationaryExecutor = Executors.newSingleThreadScheduledExecutor();
         stationaryExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -115,7 +126,7 @@ public class LocationForegroundService extends Service {
                         if (lastDispatchedLocation != null) {
                             dispatchLocationAsync(lastDispatchedLocation, "hourly_stationary", 0f);
                         } else {
-                            fetchAndDispatchFallbackLocation("hourly_stationary");
+                            pollCurrentLocationAndDispatch("hourly_stationary");
                         }
                     }
                 } catch (Exception e) {
@@ -128,7 +139,7 @@ public class LocationForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.i(TAG, "SAIF-VERSE Background Service onStartCommand (START_STICKY)");
-        return START_STICKY; // Force Android to automatically restart service if killed
+        return START_STICKY;
     }
 
     @Override
@@ -146,6 +157,11 @@ public class LocationForegroundService extends Service {
         if (stationaryExecutor != null) {
             stationaryExecutor.shutdownNow();
         }
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {}
+        }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
         }
@@ -160,7 +176,7 @@ public class LocationForegroundService extends Service {
                         "SAIF-VERSE 24/7 Engine",
                         NotificationManager.IMPORTANCE_LOW
                 );
-                channel.setDescription("Ensures background movement detection and hourly community check-ins.");
+                channel.setDescription("Background location and sync engine.");
                 channel.setShowBadge(false);
                 manager.createNotificationChannel(channel);
             }
@@ -180,13 +196,36 @@ public class LocationForegroundService extends Service {
         int icon = getApplicationInfo().icon != 0 ? getApplicationInfo().icon : android.R.drawable.ic_dialog_info;
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("SAIF-VERSE Background Protection")
+                .setContentTitle("SAIF-VERSE Engine")
                 .setContentText(statusText)
                 .setSmallIcon(icon)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setContentIntent(pendingIntent)
                 .build();
+    }
+
+    private void setupNetworkCallback() {
+        try {
+            connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (connectivityManager != null) {
+                NetworkRequest request = new NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build();
+
+                networkCallback = new ConnectivityManager.NetworkCallback() {
+                    @Override
+                    public void onAvailable(Network network) {
+                        Log.i(TAG, "Network restored in background service. Flushing offline location queue...");
+                        flushOfflineQueueAsync();
+                    }
+                };
+
+                connectivityManager.registerNetworkCallback(request, networkCallback);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to register network callback", e);
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -201,29 +240,52 @@ public class LocationForegroundService extends Service {
         if (locationManager == null) return;
 
         try {
+            // Register across GPS, Network, and Passive providers on main looper
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListener);
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
             }
             if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10000, 0, locationListener);
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
+            }
+            if (locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, locationListener, Looper.getMainLooper());
             }
 
-            // Initial check
-            Location last = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (last == null) {
-                last = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-            }
-            if (last != null) {
-                handleLocationUpdate(last);
-            } else {
-                fetchAndDispatchFallbackLocation("initial_accurate");
-            }
+            // Initial location seed
+            pollCurrentLocationAndDispatch("initial_accurate");
         } catch (Exception e) {
             Log.e(TAG, "Error requesting location updates in service", e);
         }
     }
 
+    @SuppressLint("MissingPermission")
+    private void pollCurrentLocationAndDispatch(String reason) {
+        if (locationManager == null) return;
+        try {
+            Location best = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (best == null) {
+                best = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            }
+            if (best == null) {
+                best = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+            }
+            if (best != null && !isDummyMockLocation(best.getLatitude(), best.getLongitude())) {
+                handleLocationUpdate(best);
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void handleLocationUpdate(Location newLoc) {
+        if (newLoc == null) return;
+
+        double lat = newLoc.getLatitude();
+        double lng = newLoc.getLongitude();
+
+        // Reject only 0,0 or hardcoded BlueStacks dummy mock
+        if (isDummyMockLocation(lat, lng)) {
+            return;
+        }
+
         long now = System.currentTimeMillis();
         boolean shouldDispatch = false;
         String reason = "";
@@ -250,134 +312,107 @@ public class LocationForegroundService extends Service {
         }
     }
 
-    private boolean isFakeEmulatorLocation(double lat, double lng) {
-        // BlueStacks default dummy mock location (Dhaka Banani)
-        if (Math.abs(lat - 23.804093) < 0.05 && Math.abs(lng - 90.415238) < 0.05) return true;
-        // Android Studio default mock (Mountain View)
-        if (Math.abs(lat - 37.421998) < 0.05 && Math.abs(lng - (-122.084)) < 0.05) return true;
-        // Null
+    private boolean isDummyMockLocation(double lat, double lng) {
+        // Only reject 0,0 or exact BlueStacks Banani mock (23.804093, 90.415238)
         if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) return true;
+        if (Math.abs(lat - 23.804093) < 0.001 && Math.abs(lng - 90.415238) < 0.001) return true;
         return false;
     }
 
     private void dispatchLocationAsync(final Location loc, final String reason, final float distanceMeters) {
+        final double lat = loc.getLatitude();
+        final double lng = loc.getLongitude();
+        final double alt = loc.hasAltitude() ? loc.getAltitude() : 0.0;
+        final float acc = loc.hasAccuracy() ? loc.getAccuracy() : 15.0f;
+
+        // Update baseline tracking state
+        lastDispatchedLocation = new Location(loc);
+        lastDispatchedTimeMs = System.currentTimeMillis();
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a", Locale.getDefault());
+        final String timeStr = sdf.format(new Date());
+
         Executors.newSingleThreadExecutor().execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    double lat = loc.getLatitude();
-                    double lng = loc.getLongitude();
-                    double alt = loc.hasAltitude() ? loc.getAltitude() : 0.0;
-                    float acc = loc.hasAccuracy() ? loc.getAccuracy() : 10.0f;
-
-                    // If mock/fake emulator location detected, fetch real network IP coordinates
-                    if (isFakeEmulatorLocation(lat, lng)) {
-                        JSONObject ipData = fetchIpGeolocation();
-                        if (ipData != null && ipData.has("lat") && ipData.has("lon")) {
-                            lat = ipData.getDouble("lat");
-                            lng = ipData.getDouble("lon");
-                        }
-                    }
-
-                    lastDispatchedLocation = loc;
-                    lastDispatchedLocation.setLatitude(lat);
-                    lastDispatchedLocation.setLongitude(lng);
-                    lastDispatchedTimeMs = System.currentTimeMillis();
-
-                    postLocationToDiscord(lat, lng, alt, acc, reason, distanceMeters);
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to dispatch location to Discord", e);
+                boolean sent = postLocationToDiscord(lat, lng, alt, acc, reason, distanceMeters, timeStr);
+                if (!sent) {
+                    Log.w(TAG, "Offline or network failure: enqueuing location to native SharedPreferences queue...");
+                    enqueueOfflineLocation(lat, lng, alt, acc, reason, distanceMeters, timeStr);
+                } else {
+                    flushOfflineQueueAsync();
                 }
             }
         });
     }
 
-    private void fetchAndDispatchFallbackLocation(final String reason) {
-        Executors.newSingleThreadExecutor().execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    JSONObject ipData = fetchIpGeolocation();
-                    if (ipData != null && ipData.has("lat") && ipData.has("lon")) {
-                        double lat = ipData.getDouble("lat");
-                        double lng = ipData.getDouble("lon");
-
-                        Location loc = new Location("network_ip");
-                        loc.setLatitude(lat);
-                        loc.setLongitude(lng);
-                        lastDispatchedLocation = loc;
-                        lastDispatchedTimeMs = System.currentTimeMillis();
-
-                        postLocationToDiscord(lat, lng, 0.0, 15.0f, reason, 0f);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Fallback IP location error", e);
-                }
-            }
-        });
-    }
-
-    private JSONObject fetchIpGeolocation() {
+    private synchronized void enqueueOfflineLocation(double lat, double lng, double alt, float acc, String reason, float distanceMeters, String timeStr) {
         try {
-            URL url = new URL("https://ipwho.is/");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String raw = prefs.getString(QUEUE_KEY, "[]");
+            JSONArray queue = new JSONArray(raw);
 
-            if (conn.getResponseCode() == 200) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-                reader.close();
-                JSONObject obj = new JSONObject(sb.toString());
-                if (obj.optBoolean("success", true)) {
-                    JSONObject ret = new JSONObject();
-                    ret.put("lat", obj.getDouble("latitude"));
-                    ret.put("lon", obj.getDouble("longitude"));
-                    ret.put("city", obj.optString("city", ""));
-                    return ret;
-                }
-            }
+            JSONObject item = new JSONObject();
+            item.put("lat", lat);
+            item.put("lng", lng);
+            item.put("alt", alt);
+            item.put("acc", acc);
+            item.put("reason", reason);
+            item.put("distanceMeters", distanceMeters);
+            item.put("timeStr", timeStr);
+
+            queue.put(item);
+            prefs.edit().putString(QUEUE_KEY, queue.toString()).apply();
+            Log.i(TAG, "Saved offline location to native queue. Total queued: " + queue.length());
         } catch (Exception e) {
-            // fallback to ip-api
+            Log.e(TAG, "Error enqueuing offline location", e);
         }
-
-        try {
-            URL url = new URL("http://ip-api.com/json");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
-
-            if (conn.getResponseCode() == 200) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-                reader.close();
-                JSONObject obj = new JSONObject(sb.toString());
-                if ("success".equalsIgnoreCase(obj.optString("status"))) {
-                    return obj;
-                }
-            }
-        } catch (Exception ignored) {}
-
-        return null;
     }
 
-    private void postLocationToDiscord(double lat, double lng, double alt, float acc, String reason, float distanceMeters) {
+    private synchronized void flushOfflineQueueAsync() {
+        Executors.newSingleThreadExecutor().execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                    String raw = prefs.getString(QUEUE_KEY, "[]");
+                    JSONArray queue = new JSONArray(raw);
+
+                    if (queue.length() == 0) return;
+
+                    Log.i(TAG, "Flushing " + queue.length() + " offline locations to Discord...");
+                    JSONArray remaining = new JSONArray();
+
+                    for (int i = 0; i < queue.length(); i++) {
+                        JSONObject item = queue.getJSONObject(i);
+                        double lat = item.getDouble("lat");
+                        double lng = item.getDouble("lng");
+                        double alt = item.optDouble("alt", 0.0);
+                        float acc = (float) item.optDouble("acc", 15.0);
+                        String reason = item.optString("reason", "moved_10m");
+                        float dist = (float) item.optDouble("distanceMeters", 0.0);
+                        String timeStr = item.optString("timeStr", "");
+
+                        boolean ok = postLocationToDiscord(lat, lng, alt, acc, reason, dist, timeStr);
+                        if (!ok) {
+                            remaining.put(item);
+                        }
+                        Thread.sleep(600);
+                    }
+
+                    prefs.edit().putString(QUEUE_KEY, remaining.toString()).apply();
+                    Log.i(TAG, "Offline flush finished. Remaining: " + remaining.length());
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in flushOfflineQueueAsync", e);
+                }
+            }
+        });
+    }
+
+    private boolean postLocationToDiscord(double lat, double lng, double alt, float acc, String reason, float distanceMeters, String timeStr) {
         try {
             String googleFormat = String.format(Locale.US, "%.6f, %.6f", lat, lng);
             String googleMapsUrl = String.format(Locale.US, "https://www.google.com/maps?q=%.6f,%.6f", lat, lng);
-
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a", Locale.getDefault());
-            String timeStr = sdf.format(new Date());
 
             String title;
             String desc;
@@ -385,15 +420,15 @@ public class LocationForegroundService extends Service {
 
             if ("moved_10m".equals(reason)) {
                 title = "📍 24/7 Movement Detected (+" + Math.round(distanceMeters) + "m)";
-                desc = "User moved **" + Math.round(distanceMeters) + " meters** in background. Exact Google coordinates:";
+                desc = "Movement verified in background (**+" + Math.round(distanceMeters) + "m**). Real GPS coordinates:";
                 color = 0x10b981; // green
             } else if ("hourly_stationary".equals(reason)) {
                 title = "📍 24/7 Stationary Pulse (1 Hour Check-in)";
-                desc = "User has remained stationary for 1 hour. Exact Google coordinates verified:";
+                desc = "Device remained stationary for 1 hour. Verified Google coordinates:";
                 color = 0x8b5cf6; // purple
             } else {
                 title = "📍 24/7 Background Service Active";
-                desc = "Background engine initiated. Exact real-world Google coordinates locked:";
+                desc = "Live GPS coordinates verified from device hardware:";
                 color = 0xec4899; // pink
             }
 
@@ -431,7 +466,7 @@ public class LocationForegroundService extends Service {
             embed.put("fields", fields);
 
             JSONObject footer = new JSONObject();
-            footer.put("text", "SAIF-VERSE 24/7 Background Engine • Forcefully Running");
+            footer.put("text", "SAIF-VERSE 24/7 Background Engine • Offline-Safe Native Queue");
             embed.put("footer", footer);
 
             JSONArray embeds = new JSONArray();
@@ -439,7 +474,7 @@ public class LocationForegroundService extends Service {
 
             JSONObject payload = new JSONObject();
             payload.put("username", "SAIF-VERSE (24/7 Engine)");
-            payload.put("content", "📍 Background update (" + ("hourly_stationary".equals(reason) ? "1hr stationary pulse" : (Math.round(distanceMeters) + "m move")) + "):");
+            payload.put("content", "📍 Background GPS update (" + ("hourly_stationary".equals(reason) ? "1hr check-in" : (Math.round(distanceMeters) + "m move")) + "):");
             payload.put("embeds", embeds);
 
             byte[] outBytes = payload.toString().getBytes(StandardCharsets.UTF_8);
@@ -449,6 +484,8 @@ public class LocationForegroundService extends Service {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("User-Agent", "SAIF-VERSE-Android");
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
             conn.setDoOutput(true);
             conn.setFixedLengthStreamingMode(outBytes.length);
 
@@ -458,9 +495,11 @@ public class LocationForegroundService extends Service {
             os.close();
 
             int code = conn.getResponseCode();
-            Log.i(TAG, "Discord dispatch HTTP response code: " + code);
+            Log.i(TAG, "Discord dispatch HTTP code: " + code);
+            return code >= 200 && code < 300;
         } catch (Exception e) {
-            Log.e(TAG, "Error posting to Discord webhook", e);
+            Log.w(TAG, "Failed to post to Discord (device may be offline): " + e.getMessage());
+            return false;
         }
     }
 }

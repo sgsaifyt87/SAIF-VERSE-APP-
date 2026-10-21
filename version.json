@@ -1,7 +1,7 @@
 {
-  "version": "1.1.3",
-  "title": "SAIF-VERSE Update v1.1.3 — 24/7 Forceful Background Engine & Direct Native Dispatch",
-  "changelog": "🌸 What's New in v1.1.3:\n• Dedicated native Android Foreground Service running forcefully 24/7 in background\n• Holds persistent WakeLock so CPU never sleeps and tracking never halts\n• Automatic background 10m movement detection even when app is minimized or phone locked\n• Guaranteed native 1-hour stationary pulse dispatching directly to Discord from native Java\n• START_STICKY auto-recovery: Android automatically restarts the service if killed\n• Ground-truth location filtering eliminates all fake emulator coordinates",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.3.apk",
+  "version": "1.1.4",
+  "title": "SAIF-VERSE Update v1.1.4 — Native Offline GPS Queue & Single Truth Location",
+  "changelog": "🌸 What's New in v1.1.4:\n• Removed duplicate second message: unified location under native Android engine (accurate real device coordinates)\n• Added native SharedPreferences offline queue: movements while offline are never lost and auto-flush the instant internet reconnects\n• Clean notification: sleek 'Active & Guarding' status text\n• Enhanced 10m background movement detection across GPS, Network, and Passive providers",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.4.apk",
   "releaseDate": "2026-10-22"
 }
