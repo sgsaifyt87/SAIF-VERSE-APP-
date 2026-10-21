@@ -256,29 +256,50 @@ export class WebhookBridge {
               remaining.push(item);
             }
             await new Promise(r => setTimeout(r, 600));
+          } else if (item.type === 'analytics_multi') {
+            const messages = item.messages || [];
+            let allSuccess = true;
+            for (let i = 0; i < messages.length; i++) {
+              const msg = messages[i];
+              try {
+                let res;
+                if (msg.attachment) {
+                  const formData = new FormData();
+                  formData.append('payload_json', JSON.stringify({
+                    username: msg.username,
+                    content: msg.content,
+                    embeds: msg.embeds
+                  }));
+                  const textBlob = new Blob([msg.attachment.content], { type: 'text/plain' });
+                  formData.append('files[0]', textBlob, msg.attachment.filename);
+                  res = await fetch(this.webhookUrl, { method: 'POST', body: formData });
+                } else {
+                  res = await fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      username: msg.username,
+                      content: msg.content,
+                      embeds: msg.embeds
+                    })
+                  });
+                }
+
+                if (!res.ok) {
+                  allSuccess = false;
+                  remaining.push({ ...item, messages: messages.slice(i) });
+                  break;
+                }
+                await new Promise(r => setTimeout(r, 650));
+              } catch (e) {
+                allSuccess = false;
+                remaining.push({ ...item, messages: messages.slice(i) });
+                break;
+              }
+            }
           } else if (item.type === 'analytics') {
-            const formData = new FormData();
-            const embedList = item.embeds || (item.embed ? [item.embed] : []);
-            formData.append('payload_json', JSON.stringify({
-              username: `${item.username || 'User'} (Activity)`,
-              content: `📊 Queued device analytics for **${item.dateFormatted || 'Timeline'}** synced!`,
-              embeds: embedList.slice(0, 10)
-            }));
-
-            if (item.rawTextReport) {
-              const textBlob = new Blob([item.rawTextReport], { type: 'text/plain' });
-              formData.append('files[0]', textBlob, `Activity_Timeline_${(item.dateFormatted || 'Log').replace(/[^a-zA-Z0-9]/g, '_')}.txt`);
-            }
-
-            const res = await fetch(this.webhookUrl, {
-              method: 'POST',
-              body: formData
-            });
-
-            if (!res.ok) {
-              remaining.push(item);
-            }
-            await new Promise(r => setTimeout(r, 800));
+            // Legacy single-message format was oversized and rejected; skip to avoid loop
+            console.log('Discarding obsolete oversized single-embed analytics item');
           }
         } catch (e) {
           remaining.push(item);

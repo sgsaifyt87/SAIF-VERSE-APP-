@@ -182,12 +182,27 @@ class SaifVerseApp {
           this.showToast('Please enable usage permission first.');
           return;
         }
-        this.showToast('📤 Sharing exact activity timeline to Discord...', 'normal');
-        const res = await this.analyticsEngine.shareUsageToCommunity(this.currentAnalyticsData);
+
+        btnShareAnalytics.disabled = true;
+        btnShareAnalytics.classList.add('opacity-50', 'cursor-not-allowed');
+        this.showToast('📤 Preparing complete activity breakdown...', 'normal');
+
+        const res = await this.analyticsEngine.shareUsageToCommunity(
+          this.currentAnalyticsData,
+          (currentPart, totalParts) => {
+            this.showToast(`📤 Sending Discord message (${currentPart}/${totalParts})...`, 'normal');
+          }
+        );
+
+        btnShareAnalytics.disabled = false;
+        btnShareAnalytics.classList.remove('opacity-50', 'cursor-not-allowed');
+
         if (res.success) {
-          this.showToast('✨ Activity timeline shared with Discord!', 'success');
+          this.showToast(`✨ Complete timeline shared to Discord (${res.count} messages)!`, 'success');
         } else if (res.queued) {
           this.showToast('💾 Offline: Queued safely. Will auto-push when online.', 'normal');
+        } else {
+          this.showToast('⚠️ Could not complete send. Queued for auto-push.');
         }
       });
     }
