@@ -1,18 +1,34 @@
 // path: src/js/updaterService.js
 // context: javascript / updaterService.js / network / target: mobile-android
 
+import { App } from '@capacitor/app';
+
 export class UpdaterService {
-  constructor(currentVersion = 'v1.0.0') {
-    this.currentVersion = currentVersion;
+  constructor(currentVersion = '1.1.1') {
+    this.currentVersion = this.cleanVersion(currentVersion);
     this.repoOwner = 'sgsaifyt87';
     this.repoName = 'SAIF-VERSE-APP-';
     this.repoUrl = `https://github.com/${this.repoOwner}/${this.repoName}`;
-    this.rawVersionUrl = `https://raw.githubusercontent.com/${this.repoOwner}/${this.repoName}/main/version.json?t=${Date.now()}`;
+    this.rawVersionUrl = `https://raw.githubusercontent.com/${this.repoOwner}/${this.repoName}/main/version.json`;
     this.apiUrl = `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/latest`;
     this.latestRelease = null;
     this.isChecking = false;
     this.notificationService = null;
     this.lastNotifiedVersion = null;
+
+    this.syncInstalledVersion();
+  }
+
+  async syncInstalledVersion() {
+    try {
+      const info = await App.getInfo();
+      if (info && info.version) {
+        console.log(`Native Android APK Version detected: ${info.version}`);
+        this.currentVersion = this.cleanVersion(info.version);
+      }
+    } catch (e) {
+      // web or fallback
+    }
   }
 
   setNotificationService(service) {
@@ -50,8 +66,13 @@ export class UpdaterService {
   }
 
   isNewer(remote, local) {
-    const rParts = this.cleanVersion(remote).split('.').map(Number);
-    const lParts = this.cleanVersion(local).split('.').map(Number);
+    const cleanR = this.cleanVersion(remote);
+    const cleanL = this.cleanVersion(local);
+    if (!cleanR || cleanR === cleanL) return false;
+
+    const rParts = cleanR.split('.').map(n => parseInt(n, 10) || 0);
+    const lParts = cleanL.split('.').map(n => parseInt(n, 10) || 0);
+
     for (let i = 0; i < Math.max(rParts.length, lParts.length); i++) {
       const r = rParts[i] || 0;
       const l = lParts[i] || 0;
@@ -63,19 +84,24 @@ export class UpdaterService {
 
   async checkForUpdates() {
     this.isChecking = true;
+    await this.syncInstalledVersion();
+
+    const timestamp = Date.now();
+    const noCacheUrl = `${this.rawVersionUrl}?t=${timestamp}`;
+
     try {
       // 1. Primary check: raw version.json directly from GitHub main branch
       try {
-        const rawRes = await fetch(this.rawVersionUrl, { cache: 'no-store' });
+        const rawRes = await fetch(noCacheUrl, { cache: 'no-store' });
         if (rawRes.ok) {
           const versionData = await rawRes.json();
-          const remoteVer = versionData.version || '1.0.0';
+          const remoteVer = this.cleanVersion(versionData.version || '1.0.0');
           const hasUpdate = this.isNewer(remoteVer, this.currentVersion);
 
           return {
             hasUpdate,
             currentVersion: this.currentVersion,
-            latestVersion: `v${this.cleanVersion(remoteVer)}`,
+            latestVersion: `v${remoteVer}`,
             releaseName: versionData.title || `SAIF-VERSE Update v${remoteVer}`,
             releaseUrl: `${this.repoUrl}`,
             downloadUrl: versionData.downloadUrl || `${this.repoUrl}/raw/main/SAIF-VERSE-v${remoteVer}.apk`,

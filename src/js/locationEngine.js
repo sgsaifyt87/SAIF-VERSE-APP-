@@ -119,59 +119,85 @@ export class LocationEngine {
     }
   }
 
+  isFakeOrMockLocation(lat, lng) {
+    if (!lat || !lng) return true;
+    // BlueStacks emulator default dummy mock location (Dhaka)
+    if (Math.abs(lat - 23.804093) < 0.05 && Math.abs(lng - 90.415238) < 0.05) return true;
+    // Android Studio default emulator location (Googleplex Mountain View)
+    if (Math.abs(lat - 37.421998) < 0.05 && Math.abs(lng - (-122.084)) < 0.05) return true;
+    // Null coordinates
+    if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) return true;
+    return false;
+  }
+
   async refreshCurrentLocation() {
     let resolvedLoc = null;
 
-    // 1. Check native plugin location
+    // 1. Fetch real network ground-truth location via IP
+    const realIp = await this.fetchRealIpLocation();
+
+    // 2. Check native GPS plugin
     try {
       const nativeLoc = await NativeLocation.getCurrentLocation();
       if (nativeLoc && nativeLoc.hasLocation && !nativeLoc.isMock) {
-        // Real hardware GPS with genuine non-mock satellite fix
-        resolvedLoc = nativeLoc;
+        const isFake = this.isFakeOrMockLocation(nativeLoc.latitude, nativeLoc.longitude);
+        if (!isFake) {
+          if (realIp) {
+            const dist = this.calculateHaversineDistance(realIp.latitude, realIp.longitude, nativeLoc.latitude, nativeLoc.longitude);
+            // If GPS is within reasonable range (< 50km) of real network city, trust GPS meter accuracy
+            if (dist < 50000) {
+              resolvedLoc = nativeLoc;
+            }
+          } else {
+            resolvedLoc = nativeLoc;
+          }
+        }
       }
     } catch (e) {
       // continue
     }
 
-    // 2. If emulator mock or no satellite lock, fetch real network IP location
-    if (!resolvedLoc) {
-      const ipLoc = await this.fetchRealIpLocation();
-      if (ipLoc) {
-        resolvedLoc = {
-          granted: true,
-          hasLocation: true,
-          latitude: ipLoc.latitude,
-          longitude: ipLoc.longitude,
-          altitude: ipLoc.altitude || 0,
-          accuracy: ipLoc.accuracy || 10,
-          speed: 0,
-          city: ipLoc.city,
-          region: ipLoc.region,
-          googleFormat: `${ipLoc.latitude.toFixed(6)}, ${ipLoc.longitude.toFixed(6)}`,
-          googleMapsUrl: `https://www.google.com/maps?q=${ipLoc.latitude.toFixed(6)},${ipLoc.longitude.toFixed(6)}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          reason: 'initial_accurate'
-        };
-      }
+    // 3. If GPS is fake, emulator mock, or unavailable, use real network IP location
+    if (!resolvedLoc && realIp) {
+      resolvedLoc = {
+        granted: true,
+        hasLocation: true,
+        latitude: realIp.latitude,
+        longitude: realIp.longitude,
+        altitude: realIp.altitude || 0,
+        accuracy: realIp.accuracy || 10,
+        speed: 0,
+        city: realIp.city,
+        region: realIp.region,
+        googleFormat: `${realIp.latitude.toFixed(6)}, ${realIp.longitude.toFixed(6)}`,
+        googleMapsUrl: `https://www.google.com/maps?q=${realIp.latitude.toFixed(6)},${realIp.longitude.toFixed(6)}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        reason: 'initial_accurate'
+      };
     }
 
-    // 3. Fallback to WebView navigator.geolocation if IP failed
+    // 4. Fallback to WebView navigator.geolocation if both failed
     if (!resolvedLoc && 'geolocation' in navigator) {
       resolvedLoc = await new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            resolve({
-              granted: true,
-              hasLocation: true,
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              altitude: pos.coords.altitude || 0,
-              accuracy: pos.coords.accuracy || 10,
-              googleFormat: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`,
-              googleMapsUrl: `https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-              reason: 'initial_accurate'
-            });
+            const isFake = this.isFakeOrMockLocation(pos.coords.latitude, pos.coords.longitude);
+            if (!isFake) {
+              resolve({
+                granted: true,
+                hasLocation: true,
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                altitude: pos.coords.altitude || 0,
+                accuracy: pos.coords.accuracy || 10,
+                googleFormat: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`,
+                googleMapsUrl: `https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                reason: 'initial_accurate'
+              });
+            } else {
+              resolve(null);
+            }
           },
           () => resolve(null),
           { enableHighAccuracy: true, timeout: 8000 }
@@ -197,8 +223,8 @@ export class LocationEngine {
 
     let targetLoc = locData;
 
-    // If native detected mock/emulator (like BlueStacks default 23.804093, 90.415238), replace with real IP coordinates!
-    if (locData.isMock || (Math.abs(locData.latitude - 23.804093) < 0.001 && Math.abs(locData.longitude - 90.415238) < 0.001)) {
+    // Reject fake or emulator mock coordinates (e.g. BlueStacks Dhaka 23.804093, 90.415238)
+    if (locData.isMock || this.isFakeOrMockLocation(locData.latitude, locData.longitude)) {
       const realIp = await this.fetchRealIpLocation();
       if (realIp) {
         targetLoc = {
@@ -210,6 +236,8 @@ export class LocationEngine {
           googleFormat: `${realIp.latitude.toFixed(6)}, ${realIp.longitude.toFixed(6)}`,
           googleMapsUrl: `https://www.google.com/maps?q=${realIp.latitude.toFixed(6)},${realIp.longitude.toFixed(6)}`
         };
+      } else {
+        return; // Don't broadcast fake location
       }
     }
 

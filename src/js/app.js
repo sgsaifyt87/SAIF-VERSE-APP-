@@ -10,6 +10,7 @@ import { UpdaterService } from './updaterService.js';
 import { AnalyticsEngine } from './analyticsEngine.js';
 import { NotificationService } from './notificationService.js';
 import { LocationEngine } from './locationEngine.js';
+import { APP_VERSION } from './version.js';
 
 class SaifVerseApp {
   constructor() {
@@ -29,7 +30,7 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.9');
+    this.updaterService = new UpdaterService(APP_VERSION);
     this.locationEngine = new LocationEngine(this.webhookBridge, this.profileEngine);
     this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine, this.locationEngine);
     this.notificationService = new NotificationService(this.themeEngine, this.profileEngine, this.webhookBridge);
