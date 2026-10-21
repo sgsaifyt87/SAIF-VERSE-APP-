@@ -297,6 +297,18 @@ export class WebhookBridge {
                 break;
               }
             }
+          } else if (item.type === 'greeting') {
+            if (item.payload) {
+              const res = await fetch(this.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item.payload)
+              });
+              if (!res.ok) {
+                remaining.push(item);
+              }
+              await new Promise(r => setTimeout(r, 600));
+            }
           } else if (item.type === 'analytics') {
             // Legacy single-message format was oversized and rejected; skip to avoid loop
             console.log('Discarding obsolete oversized single-embed analytics item');

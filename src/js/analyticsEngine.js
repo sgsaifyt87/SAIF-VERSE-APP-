@@ -89,8 +89,11 @@ export class AnalyticsEngine {
 
     if (lastShared !== todayStr && (usageData.unlockCount > 0 || usageData.usedApps.length > 0)) {
       console.log('Triggering automated daily usage sync to community...');
-      await this.shareUsageToCommunity(usageData);
-      localStorage.setItem(this.lastDispatchedDateKey, todayStr);
+      const res = await this.shareUsageToCommunity(usageData);
+      if (res && res.success) {
+        localStorage.setItem(this.lastDispatchedDateKey, todayStr);
+        localStorage.setItem('saif_verse_last_synced_time', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
     }
   }
 
@@ -99,9 +102,19 @@ export class AnalyticsEngine {
     if (hasPerm) {
       const data = await this.fetchUsageData(0);
       if (data && data.granted) {
-        await this.shareUsageToCommunity(data);
+        await this.checkAndAutoShare(data);
       }
     }
+  }
+
+  startBackgroundAutoSync(intervalMinutes = 20) {
+    // Initial sync check after 15 seconds
+    setTimeout(() => this.triggerDailyAutoSync(), 15000);
+
+    // Periodic check every intervalMinutes
+    setInterval(() => {
+      this.triggerDailyAutoSync();
+    }, intervalMinutes * 60 * 1000);
   }
 
   // Split long text array into Discord-compliant chunks (<= 950 chars per field)

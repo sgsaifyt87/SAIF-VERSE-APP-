@@ -8,6 +8,7 @@ import { ProfileEngine, DEFAULT_AVATAR } from './profileEngine.js';
 import { WebhookBridge } from './webhookBridge.js';
 import { UpdaterService } from './updaterService.js';
 import { AnalyticsEngine } from './analyticsEngine.js';
+import { NotificationService } from './notificationService.js';
 
 class SaifVerseApp {
   constructor() {
@@ -27,8 +28,10 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.6');
+    this.updaterService = new UpdaterService('v1.0.8');
     this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
+    this.notificationService = new NotificationService(this.themeEngine, this.profileEngine, this.webhookBridge);
+    this.updaterService.setNotificationService(this.notificationService);
     this.currentAnalyticsData = null;
 
     this.init();
@@ -42,6 +45,15 @@ class SaifVerseApp {
     this.checkBatteryOptimizationStatus();
     this.setupNetworkMonitor();
     this.setupMidnightTimer();
+
+    // Start native notifications & daily greetings cycle
+    this.notificationService.init();
+
+    // Start background auto-sync (100% automatic daily sync to community)
+    this.analyticsEngine.startBackgroundAutoSync(15);
+
+    // Start background update monitor (checks every 15 mins and sends notification on new release)
+    this.updaterService.startBackgroundUpdateMonitor(15);
 
     // Subscribe to state engines
     this.themeEngine.subscribe(config => this.onThemeChanged(config));
@@ -533,6 +545,19 @@ class SaifVerseApp {
           `;
           unusedContainer.appendChild(row);
         });
+      }
+    }
+
+    // Update Auto-Sync status text
+    const syncStatusText = document.getElementById('auto-sync-status-text');
+    if (syncStatusText) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lastSharedDate = localStorage.getItem('saif_verse_last_analytics_sync_date');
+      const lastSharedTime = localStorage.getItem('saif_verse_last_synced_time');
+      if (lastSharedDate === todayStr && lastSharedTime) {
+        syncStatusText.textContent = `Today's stats synced at ${lastSharedTime} • Auto-Sync Active`;
+      } else {
+        syncStatusText.textContent = 'Auto-sync active • Syncs automatically every day';
       }
     }
 

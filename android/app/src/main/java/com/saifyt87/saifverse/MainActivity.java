@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(UsageAnalyticsPlugin.class);
+        registerPlugin(NotificationPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -391,6 +391,162 @@ export const CALENDAR_ROUTINES = {
     title: 'November Finale: The Transition to Winter',
     routine: 'Morning: Write your November completion letter to yourself. Evening: Celebrate closing November with grace and power.',
     prompt: 'November bows out tonight. What are you leaving behind in November, and what fire are you carrying into the final month of the year?'
+  },
+  // --- DECEMBER (31 DAYS) ---
+  '12-01': {
+    title: 'December Dawn: The Final Masterpiece',
+    routine: 'Morning: Set 3 core pillars for your final month of 2026. Afternoon: Tidy workspace and reset digital devices. Evening: Light a candle and write your December manifesto.',
+    prompt: 'December is here. The final chapter of the year. How do you want to show up in these last 31 days to make yourself proud?'
+  },
+  '12-02': {
+    title: 'Inner Warmth & Unshakable Focus',
+    routine: 'Morning: 5 minutes of stillness and warm tea. Afternoon: 45 minutes deep execution on your top goal. Evening: Write down one victory from today.',
+    prompt: 'When the outside world feels rushed, what is your anchor of peace? How can you cultivate inner quiet today?'
+  },
+  '12-03': {
+    title: 'Declutter & Simplify',
+    routine: 'Morning: Clear 10 unnecessary items or files. Afternoon: Streamline your daily task list to only essentials. Evening: Relax with soothing music.',
+    prompt: 'Simplicity brings elegance. What baggage—mental, emotional, or physical—can you drop today to walk lighter?'
+  },
+  '12-04': {
+    title: 'Friday Momentum & Year-End Drive',
+    routine: 'Morning: High-energy stretch and clear priority list. Afternoon: Finish all open commitments. Evening: Reward yourself with a comforting dinner.',
+    prompt: 'Look at the week you just conquered. What made you smile? Where did your perseverance shine brightest?'
+  },
+  '12-05': {
+    title: 'Winter Weekend: Joy & Rest',
+    routine: 'Morning: Sleep in and enjoy a slow morning. Afternoon: Free creative exploration or outdoor stroll. Evening: Connect with someone you love.',
+    prompt: 'Rest is not a reward; it is a necessity. What activity refills your soul with pure, unhurried delight?'
+  },
+  '12-06': {
+    title: 'Sunday Clarity & Reset',
+    routine: 'Morning: Reflect on your energy levels and reset priorities. Afternoon: Prep healthy meals and plan your upcoming week. Evening: Early restful bedtime.',
+    prompt: 'Sunday evening reflection: What is the single most important milestone you want to conquer in the week ahead?'
+  },
+  '12-07': {
+    title: 'Architect of Habits',
+    routine: 'Morning: Anchor your morning routine without screen distraction. Afternoon: Maintain laser focus during deep work. Evening: Evening walk and gentle stretch.',
+    prompt: 'We are what we repeatedly do. Which daily habit has been your greatest superpower this month?'
+  },
+  '12-08': {
+    title: 'Quiet Strength & Resilience',
+    routine: 'Morning: Box breathing (4s in, 4s hold, 4s out, 4s hold). Afternoon: Overcome the hardest task of the day first. Evening: Journal about an obstacle turned lesson.',
+    prompt: 'True strength is often calm and quiet. Where did you hold your composure in the face of pressure today?'
+  },
+  '12-09': {
+    title: 'Midweek Equilibrium',
+    routine: 'Morning: Express gratitude for 3 small things. Afternoon: Step away for a 15-minute nature reset. Evening: Reconnect with your personal creative project.',
+    prompt: 'Check in with your heart: Are you rushing through life or actually living each minute? How can you slow down and savor right now?'
+  },
+  '12-10': {
+    title: 'The Art of Appreciation',
+    routine: 'Morning: Send an unexpected encouraging message to someone. Afternoon: Savor your lunch mindfully. Evening: Write a note of self-appreciation in SAIF-VERSE.',
+    prompt: 'Whose presence has brought light into your life recently? How can you honor and appreciate them today?'
+  },
+  '12-11': {
+    title: 'Closing the Gaps',
+    routine: 'Morning: Identify the one thing you have been procrastinating on. Afternoon: Complete it with relentless focus. Evening: Celebrate crossing the finish line.',
+    prompt: 'What freedom do you feel when an overdue task is finally done? How does taking bold action transform your confidence?'
+  },
+  '12-12': {
+    title: 'Winter Sanctuary',
+    routine: 'Morning: Gentle morning yoga or breathing. Afternoon: Cozy reading, gaming, or artistic hobby. Evening: Warm bath or shower and peaceful reflection.',
+    prompt: 'Design your perfect sanctuary day: What sounds, scents, and thoughts bring you absolute peace?'
+  },
+  '12-13': {
+    title: 'Mid-Month Alignment Check',
+    routine: 'Morning: Assess your December goals. Afternoon: Recalibrate timelines with kindness. Evening: Set your game plan for the second half of December.',
+    prompt: 'Halfway through the year’s final month. What course correction will make the remaining days unforgettable?'
+  },
+  '12-14': {
+    title: 'Relentless Courage',
+    routine: 'Morning: Affirm: I am capable of mastering any challenge. Afternoon: Tackle a high-impact creative endeavor. Evening: Unplug from all devices 1 hour before bed.',
+    prompt: 'What bold move have you been hesitating to make? What would happen if you trusted your instincts completely?'
+  },
+  '12-15': {
+    title: 'Radiant Positivity',
+    routine: 'Morning: Smile in the mirror and speak life into your vision. Afternoon: Spread kindness to everyone you interact with. Evening: Document today’s brightest moments.',
+    prompt: 'Your energy introduces you before you even speak. What energy did you radiate into the rooms you walked into today?'
+  },
+  '12-16': {
+    title: 'Deep Focus & Flow State',
+    routine: 'Morning: 90-minute uninterrupted deep work sprint. Afternoon: Hydrate and walk in the fresh air. Evening: Reflect on what flow feels like to you.',
+    prompt: 'When you are in true flow, time disappears. What work makes you forget to check your phone?'
+  },
+  '12-17': {
+    title: 'Empathy & Harmony',
+    routine: 'Morning: Listen deeply without formulating your response. Afternoon: Offer genuine help to a colleague or friend. Evening: Practice forgiveness for any misunderstandings.',
+    prompt: 'Understanding is an act of love. How can you practice deeper empathy towards yourself and others today?'
+  },
+  '12-18': {
+    title: 'Pre-Holiday Clarity',
+    routine: 'Morning: Finalize all major commitments for the month. Afternoon: Clear out your inbox and workspace. Evening: Savor a relaxing weekend transition.',
+    prompt: 'As the year winds down, what are you most eager to celebrate? What was your proudest breakthrough?'
+  },
+  '12-19': {
+    title: 'Winter Solstice Reflection',
+    routine: 'Morning: Welcoming the longest nights with cozy comfort. Afternoon: Spend quiet time reflecting on your personal journey. Evening: Share warm memories with family.',
+    prompt: 'In the stillness of the winter season, what truth is whispering to your soul? What dreams are waiting to bloom in the coming year?'
+  },
+  '12-20': {
+    title: 'The Gift of Presence',
+    routine: 'Morning: Put your phone away for the first 2 hours of the day. Afternoon: Engage fully in every conversation. Evening: Note what you noticed when you were truly present.',
+    prompt: 'The greatest gift you can offer anyone is your undivided attention. How did presence change your connections today?'
+  },
+  '12-21': {
+    title: 'Solstice Dawn: Turning Toward Light',
+    routine: 'Morning: Greet the dawn with gratitude. Afternoon: Reflect on the darkness you conquered this year. Evening: Journal about the light ahead.',
+    prompt: 'Even the longest night gives way to dawn. What light did you find within yourself during difficult moments this year?'
+  },
+  '12-22': {
+    title: 'Kindness as a Daily Practice',
+    routine: 'Morning: Start with compassionate self-talk. Afternoon: Do one quiet act of service. Evening: Write down 3 blessings you received today.',
+    prompt: 'Kindness costs nothing but changes everything. How did a small act of kindness shift your spirit today?'
+  },
+  '12-23': {
+    title: 'Holiday Serenity',
+    routine: 'Morning: Slow coffee or tea, breathing in peace. Afternoon: Connect with loved ones and share warmth. Evening: Listen to comforting music and rest.',
+    prompt: 'Peace is a choice made moment by moment. How can you protect your peace amid festive celebrations?'
+  },
+  '12-24': {
+    title: 'Winter Eve: Gratitude & Warmth',
+    routine: 'Morning: Reflect on the beauty of family and friends. Afternoon: Share gifts, warm greetings, or kind messages. Evening: Rest in cozy tranquility.',
+    prompt: 'On this peaceful winter eve, what are the simple treasures in your life that money can never buy?'
+  },
+  '12-25': {
+    title: 'A Day of Heartfelt Joy',
+    routine: 'Morning: Savor every bite of breakfast and smile. Afternoon: Celebrate love, togetherness, and connection. Evening: Savor heartfelt memories.',
+    prompt: 'Today is about warmth, love, and community. What brought genuine joy to your heart today?'
+  },
+  '12-26': {
+    title: 'The Great Year-End Review (Part 1)',
+    routine: 'Morning: Review your notes from January to June in SAIF-VERSE. Afternoon: Write down major milestones and breakthroughs. Evening: Acknowledge how far you have journeyed.',
+    prompt: 'Look back at where you started this year. Can you see how much wiser, resilient, and stronger you have become?'
+  },
+  '12-27': {
+    title: 'The Great Year-End Review (Part 2)',
+    routine: 'Morning: Review your notes from July to December in SAIF-VERSE. Afternoon: Identify the biggest lessons learned from hardship. Evening: Write a letter of release for past mistakes.',
+    prompt: 'Hardships are master teachers. What wisdom did your toughest challenge this year give you?'
+  },
+  '12-28': {
+    title: 'Harvesting the Wisdom',
+    routine: 'Morning: Condense your year into 5 golden life principles. Afternoon: Share one insight with a close friend. Evening: Feel proud of your relentless spirit.',
+    prompt: 'If you had to pass down the 3 greatest lessons you learned this year, what would they be?'
+  },
+  '12-29': {
+    title: 'Visioning the New Horizon',
+    routine: 'Morning: Brainstorm your dream goals for 2027. Afternoon: Categorize them into Health, Wealth, Mastery, and Peace. Evening: Visualize yourself living that reality.',
+    prompt: 'Dream without limits: Who are you becoming in the next year? What bold adventure will you embark upon?'
+  },
+  '12-30': {
+    title: 'The Final Preparations',
+    routine: 'Morning: Complete all loose ends. Afternoon: Deep clean your personal space and reset your devices. Evening: Spend a peaceful evening preparing your mindset.',
+    prompt: 'Clean space, clean mind. As the final hours approach, what are you ready to close the book on forever?'
+  },
+  '12-31': {
+    title: 'New Year’s Eve: The Grand Celebration',
+    routine: 'Morning: Write your heartfelt closing note for 2026. Afternoon: Celebrate your survival, growth, and triumphs with those you cherish. Midnight: Step boldly into the new year!',
+    prompt: 'You made it. You fought, you grew, you loved, and you conquered. Stand tall and celebrate your journey tonight! What is your word for the new year?'
   }
 };
 

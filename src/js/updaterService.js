@@ -11,6 +11,38 @@ export class UpdaterService {
     this.apiUrl = `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/latest`;
     this.latestRelease = null;
     this.isChecking = false;
+    this.notificationService = null;
+    this.lastNotifiedVersion = null;
+  }
+
+  setNotificationService(service) {
+    this.notificationService = service;
+  }
+
+  startBackgroundUpdateMonitor(intervalMinutes = 15) {
+    // Initial check after 10 seconds
+    setTimeout(() => this.runBackgroundUpdateCheck(), 10000);
+
+    // Periodic check
+    setInterval(() => {
+      this.runBackgroundUpdateCheck();
+    }, intervalMinutes * 60 * 1000);
+  }
+
+  async runBackgroundUpdateCheck() {
+    try {
+      const res = await this.checkForUpdates();
+      if (res.hasUpdate && res.latestVersion) {
+        if (this.lastNotifiedVersion !== res.latestVersion) {
+          this.lastNotifiedVersion = res.latestVersion;
+          if (this.notificationService) {
+            await this.notificationService.notifyUpdateAvailable(res.latestVersion);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Background update check failed:', e);
+    }
   }
 
   cleanVersion(v) {
