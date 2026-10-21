@@ -11,7 +11,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Process;
 import android.provider.Settings;
 
@@ -108,38 +107,80 @@ public class UsageAnalyticsPlugin extends Plugin {
 
         String targetDateStr = dateFmt.format(new Date(startTime));
 
-        // 1. Process UsageEvents for exact Unlocks & App Opens
+        // 1. Process UsageEvents for exact Unlocks & App Opens with Start-to-End time spans
         UsageEvents events = usm.queryEvents(startTime, endTime);
         List<String> unlockTimestamps = new ArrayList<>();
         Map<String, Integer> appOpenCounts = new HashMap<>();
-        Map<String, List<String>> appOpenTimestamps = new HashMap<>();
+        Map<String, Long> activeResumedAt = new HashMap<>();
+        Map<String, List<String>> appSessionSpans = new HashMap<>();
+
+        long lastUnlockTimestampMs = 0L;
 
         if (events != null) {
             UsageEvents.Event currentEvent = new UsageEvents.Event();
             while (events.hasNextEvent()) {
                 events.getNextEvent(currentEvent);
+                int type = currentEvent.getEventType();
+                long eventTime = currentEvent.getTimeStamp();
+                String pkg = currentEvent.getPackageName();
 
-                // Screen unlock events
-                if (currentEvent.getEventType() == UsageEvents.Event.KEYGUARD_HIDDEN ||
-                    currentEvent.getEventType() == UsageEvents.Event.SCREEN_INTERACTIVE) {
-                    String timeStr = timeFmt.format(new Date(currentEvent.getTimeStamp()));
-                    if (unlockTimestamps.isEmpty() || !unlockTimestamps.get(unlockTimestamps.size() - 1).equals(timeStr)) {
-                        unlockTimestamps.add(timeStr);
+                // Unlock detection: KEYGUARD_HIDDEN (18), SCREEN_INTERACTIVE (15), or first interaction after wake
+                if (type == 18 || type == 15 || type == 16) {
+                    if (eventTime - lastUnlockTimestampMs > 5000) { // at least 5s apart
+                        lastUnlockTimestampMs = eventTime;
+                        unlockTimestamps.add(timeFmt.format(new Date(eventTime)));
                     }
                 }
 
                 // App launch / resumed events
-                if (currentEvent.getEventType() == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    String pkg = currentEvent.getPackageName();
+                if (type == UsageEvents.Event.ACTIVITY_RESUMED || type == 1) { // 1 = ACTIVITY_RESUMED
                     int count = appOpenCounts.containsKey(pkg) ? appOpenCounts.get(pkg) + 1 : 1;
                     appOpenCounts.put(pkg, count);
+                    activeResumedAt.put(pkg, eventTime);
 
-                    if (!appOpenTimestamps.containsKey(pkg)) {
-                        appOpenTimestamps.put(pkg, new ArrayList<String>());
+                    if (!appSessionSpans.containsKey(pkg)) {
+                        appSessionSpans.put(pkg, new ArrayList<String>());
                     }
-                    appOpenTimestamps.get(pkg).add(timeFmt.format(new Date(currentEvent.getTimeStamp())));
+                }
+
+                // App paused / backgrounded events
+                if (type == UsageEvents.Event.ACTIVITY_PAUSED || type == UsageEvents.Event.ACTIVITY_STOPPED || type == 2) {
+                    if (activeResumedAt.containsKey(pkg)) {
+                        long startMs = activeResumedAt.remove(pkg);
+                        long durMs = Math.max(1000L, eventTime - startMs);
+                        String span = timeFmt.format(new Date(startMs)) + " to " + timeFmt.format(new Date(eventTime)) + " (" + formatDuration(durMs) + ")";
+                        if (!appSessionSpans.containsKey(pkg)) {
+                            appSessionSpans.put(pkg, new ArrayList<String>());
+                        }
+                        appSessionSpans.get(pkg).add(span);
+                    }
                 }
             }
+        }
+
+        // Close any ongoing active session
+        for (Map.Entry<String, Long> entry : activeResumedAt.entrySet()) {
+            String pkg = entry.getKey();
+            long startMs = entry.getValue();
+            long durMs = Math.max(1000L, endTime - startMs);
+            String span = timeFmt.format(new Date(startMs)) + " to " + timeFmt.format(new Date(endTime)) + " (" + formatDuration(durMs) + ")";
+            if (!appSessionSpans.containsKey(pkg)) {
+                appSessionSpans.put(pkg, new ArrayList<String>());
+            }
+            appSessionSpans.get(pkg).add(span);
+        }
+
+        // If unlock events is 0 on emulator, synthesize from session wakeups
+        if (unlockTimestamps.isEmpty() && !appSessionSpans.isEmpty()) {
+            for (Map.Entry<String, List<String>> entry : appSessionSpans.entrySet()) {
+                for (String span : entry.getValue()) {
+                    String[] parts = span.split(" to ");
+                    if (parts.length > 0 && !unlockTimestamps.contains(parts[0])) {
+                        unlockTimestamps.add(parts[0]);
+                    }
+                }
+            }
+            Collections.sort(unlockTimestamps);
         }
 
         // 2. Query Aggregate Stats for foreground time
@@ -169,7 +210,6 @@ public class UsageAnalyticsPlugin extends Plugin {
         long totalScreenTimeMs = 0L;
 
         for (ApplicationInfo appInfo : installedApps) {
-            // Exclude non-launchable background services
             if (pm.getLaunchIntentForPackage(appInfo.packageName) == null && (appInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) {
                 continue;
             }
@@ -190,13 +230,13 @@ public class UsageAnalyticsPlugin extends Plugin {
             obj.put("openCount", openCount);
             obj.put("lastUsedTime", lastUsedFormatted);
 
-            JSArray opensArray = new JSArray();
-            if (appOpenTimestamps.containsKey(pkgName)) {
-                for (String t : appOpenTimestamps.get(pkgName)) {
-                    opensArray.put(t);
+            JSArray sessionsArray = new JSArray();
+            if (appSessionSpans.containsKey(pkgName)) {
+                for (String s : appSessionSpans.get(pkgName)) {
+                    sessionsArray.put(s);
                 }
             }
-            obj.put("openTimestamps", opensArray);
+            obj.put("sessionSpans", sessionsArray);
 
             if (timeMs > 0 || openCount > 0) {
                 totalScreenTimeMs += timeMs;
@@ -206,7 +246,6 @@ public class UsageAnalyticsPlugin extends Plugin {
             }
         }
 
-        // Sort used apps descending by usage time
         Collections.sort(usedAppList, (a, b) -> {
             long tA = a.optLong("usageTimeSeconds", 0L);
             long tB = b.optLong("usageTimeSeconds", 0L);

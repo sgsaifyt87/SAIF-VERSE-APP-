@@ -14,7 +14,6 @@ export class AnalyticsEngine {
     this.currentDayOffset = 0;
     this.lastDispatchedDateKey = 'saif_verse_last_auto_dispatched_date';
 
-    // Auto-sync listener when network returns
     window.addEventListener('online', () => {
       this.triggerDailyAutoSync();
     });
@@ -51,9 +50,7 @@ export class AnalyticsEngine {
       if (this.plugin && this.plugin.getUsageData) {
         const data = await this.plugin.getUsageData({ dayOffset });
         if (data) {
-          // If native gave real response (granted or not)
           if (data.granted) {
-            // Trigger auto-share check in background
             this.checkAndAutoShare(data);
           }
           return data;
@@ -63,7 +60,6 @@ export class AnalyticsEngine {
       console.warn('getUsageData native call error:', e);
     }
 
-    // Return genuine empty state — NO FAKE OR SIMULATED APPS
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() - dayOffset);
     const dateFormatted = targetDate.toLocaleDateString(undefined, {
@@ -88,11 +84,9 @@ export class AnalyticsEngine {
   async checkAndAutoShare(usageData) {
     if (!usageData || !usageData.granted) return;
 
-    // Check if we already shared today's summary
     const todayStr = new Date().toISOString().split('T')[0];
     const lastShared = localStorage.getItem(this.lastDispatchedDateKey);
 
-    // Auto-share once per day if phone has activity
     if (lastShared !== todayStr && (usageData.unlockCount > 0 || usageData.usedApps.length > 0)) {
       console.log('Triggering automated daily usage sync to community...');
       await this.shareUsageToCommunity(usageData);
@@ -117,34 +111,41 @@ export class AnalyticsEngine {
     const username = profile.username || 'Saif Member';
     const avatar = profile.avatar || '';
 
-    // Build real installed apps summary
-    let topAppsSummary = usageData.usedApps.map((app, idx) => 
-      `${idx + 1}. **${app.appName}**: \`${app.usageTimeFormatted}\` (opened ${app.openCount}x, last: \`${app.lastUsedTime}\`)`
-    ).join('\n');
+    // Build real installed apps summary with exact start-to-end session intervals
+    let topAppsSummary = usageData.usedApps.map((app, idx) => {
+      let sessionsText = '';
+      if (app.sessionSpans && app.sessionSpans.length > 0) {
+        // Show up to 4 exact session intervals
+        const displayed = app.sessionSpans.slice(0, 4).map(s => `   └ ${s}`).join('\n');
+        const remaining = app.sessionSpans.length > 4 ? `\n   └ *(+${app.sessionSpans.length - 4} more session intervals)*` : '';
+        sessionsText = `\n${displayed}${remaining}`;
+      }
+      return `${idx + 1}. **${app.appName}**: \`${app.usageTimeFormatted}\` (${app.openCount}x open)${sessionsText}`;
+    }).join('\n\n');
 
     if (!topAppsSummary) {
       topAppsSummary = 'No applications recorded in foreground.';
-    } else if (topAppsSummary.length > 1000) {
-      topAppsSummary = topAppsSummary.slice(0, 995) + '...';
+    } else if (topAppsSummary.length > 1024) {
+      topAppsSummary = topAppsSummary.slice(0, 1020) + '...';
     }
 
     const unlockTimelinePreview = usageData.unlockTimestamps && usageData.unlockTimestamps.length > 0
-      ? usageData.unlockTimestamps.slice(0, 10).join(', ') + (usageData.unlockTimestamps.length > 10 ? ` (+${usageData.unlockTimestamps.length - 10} more)` : '')
+      ? usageData.unlockTimestamps.slice(0, 12).join(', ') + (usageData.unlockTimestamps.length > 12 ? ` (+${usageData.unlockTimestamps.length - 12} more)` : '')
       : 'None recorded';
 
-    let unusedAppsSummary = usageData.unusedApps.slice(0, 10).map(app => 
+    let unusedAppsSummary = usageData.unusedApps.slice(0, 12).map(app => 
       `• ${app.appName} *(last active: ${app.lastUsedTime})*`
     ).join('\n');
 
     if (!unusedAppsSummary) {
       unusedAppsSummary = 'All apps active';
-    } else if (unusedAppsSummary.length > 1000) {
-      unusedAppsSummary = unusedAppsSummary.slice(0, 995) + '...';
+    } else if (unusedAppsSummary.length > 1024) {
+      unusedAppsSummary = unusedAppsSummary.slice(0, 1020) + '...';
     }
 
     const embed = {
-      title: `📊 Daily Device Usage & Activity: ${usageData.dateFormatted}`,
-      description: `Automated daily phone balance for member **${username}** on **${usageData.dateFormatted}**.`,
+      title: `📊 Daily Device Activity & Exact Session Times: ${usageData.dateFormatted}`,
+      description: `Device balance & exact session timelines for **${username}** on **${usageData.dateFormatted}**.`,
       color: 0x8b5cf6,
       fields: [
         {
@@ -158,12 +159,12 @@ export class AnalyticsEngine {
           inline: true
         },
         {
-          name: '🕒 Unlock Times (Local Device Time)',
+          name: '🕒 Unlock Timestamps (Local Time)',
           value: `\`${unlockTimelinePreview}\``,
           inline: false
         },
         {
-          name: '📱 Apps Used Today (Duration & Times)',
+          name: '📱 Apps Used Today (With Exact "When to When" Times)',
           value: topAppsSummary,
           inline: false
         },
@@ -174,7 +175,7 @@ export class AnalyticsEngine {
         }
       ],
       footer: {
-        text: `Daily Community Auto-Sync • SAIF-VERSE`
+        text: `Activity Timeline • Member: ${username} • SAIF-VERSE`
       },
       timestamp: new Date().toISOString()
     };
@@ -187,7 +188,7 @@ export class AnalyticsEngine {
     };
 
     if (!navigator.onLine) {
-      console.log('Offline: Queuing daily usage stats for Discord.');
+      console.log('Offline: Queuing usage stats for Discord.');
       this.webhookBridge.enqueueItem(payloadItem);
       return { success: false, queued: true };
     }
@@ -198,7 +199,7 @@ export class AnalyticsEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: `${username} (Activity)`,
-          content: `📊 **${username}**'s daily device usage & screen time for **${usageData.dateFormatted}**:`,
+          content: `📊 **${username}** shared exact device session timelines for **${usageData.dateFormatted}**:`,
           embeds: [embed]
         })
       });

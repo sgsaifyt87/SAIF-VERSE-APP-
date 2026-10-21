@@ -27,7 +27,7 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.4');
+    this.updaterService = new UpdaterService('v1.0.5');
     this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
     this.currentAnalyticsData = null;
 
@@ -170,6 +170,24 @@ class SaifVerseApp {
         } else {
           unusedContainer.classList.add('hidden');
           if (unusedIcon) unusedIcon.textContent = '▼';
+        }
+      });
+    }
+
+    // Share Analytics to Community Button
+    const btnShareAnalytics = document.getElementById('btn-share-analytics');
+    if (btnShareAnalytics) {
+      btnShareAnalytics.addEventListener('click', async () => {
+        if (!this.currentAnalyticsData || !this.currentAnalyticsData.granted) {
+          this.showToast('Please enable usage permission first.');
+          return;
+        }
+        this.showToast('📤 Sharing exact activity timeline to Discord...', 'normal');
+        const res = await this.analyticsEngine.shareUsageToCommunity(this.currentAnalyticsData);
+        if (res.success) {
+          this.showToast('✨ Activity timeline shared with Discord!', 'success');
+        } else if (res.queued) {
+          this.showToast('💾 Offline: Queued safely. Will auto-push when online.', 'normal');
         }
       });
     }
@@ -449,7 +467,20 @@ class SaifVerseApp {
         data.usedApps.forEach(app => {
           const pct = Math.max(8, Math.min(100, Math.round((app.usageTimeSeconds / maxSecs) * 100)));
           const row = document.createElement('div');
-          row.className = 'glass-card p-2.5 rounded-xl space-y-1.5';
+          row.className = 'glass-card p-3 rounded-xl space-y-2';
+
+          let sessionsHtml = '';
+          if (app.sessionSpans && app.sessionSpans.length > 0) {
+            sessionsHtml = `
+              <div class="mt-2 pt-2 border-t border-white/10 space-y-1">
+                <span class="text-[9px] font-bold text-pink-300 uppercase tracking-wider block">Exact Active Sessions:</span>
+                <div class="space-y-1 max-h-32 overflow-y-auto pr-1">
+                  ${app.sessionSpans.map(s => `<div class="text-[10px] text-white/80 font-mono pl-1.5 border-l-2 border-pink-400/50">🕒 ${s}</div>`).join('')}
+                </div>
+              </div>
+            `;
+          }
+
           row.innerHTML = `
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold text-white">${app.appName}</span>
@@ -462,6 +493,7 @@ class SaifVerseApp {
               <span>Opened ${app.openCount} times</span>
               <span>Last: ${app.lastUsedTime.split(' ').slice(-2).join(' ')}</span>
             </div>
+            ${sessionsHtml}
           `;
           appsList.appendChild(row);
         });

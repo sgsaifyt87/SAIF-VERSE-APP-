@@ -1,7 +1,7 @@
 {
-  "version": "1.0.4",
-  "title": "SAIF-VERSE Update v1.0.4 — Real Device Analytics & Automated Sync",
-  "changelog": "🌸 What's New in v1.0.4:\n• Fixed native UsageAnalytics bridge for 100% genuine device data\n• Removed simulated data fallback: only displays real installed apps & unlocks\n• Automated daily community broadcast (manual share button removed)\n• Offline queueing: usage data safely auto-pushes when internet reconnects\n• Native Usage Access permission prompt & deep-link into Android settings",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.4.apk",
+  "version": "1.0.5",
+  "title": "SAIF-VERSE Update v1.0.5 — Exact Session Intervals & Community Sync",
+  "changelog": "🌸 What's New in v1.0.5:\n• Exact when-to-when session intervals for every app launch\n• Emulator & phone screen unlock detection with wake timestamps\n• Re-introduced one-tap Community Sync button alongside automatic daily push\n• Detailed session drawer under each application in Activity tab\n• Full offline queue safety preserving all session timestamps",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.5.apk",
   "releaseDate": "2026-10-22"
 }
