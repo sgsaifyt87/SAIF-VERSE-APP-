@@ -256,20 +256,29 @@ export class WebhookBridge {
               remaining.push(item);
             }
             await new Promise(r => setTimeout(r, 600));
-          } else if (item.type === 'analytics' && item.embed) {
+          } else if (item.type === 'analytics') {
+            const formData = new FormData();
+            const embedList = item.embeds || (item.embed ? [item.embed] : []);
+            formData.append('payload_json', JSON.stringify({
+              username: `${item.username || 'User'} (Activity)`,
+              content: `📊 Queued device analytics for **${item.dateFormatted || 'Timeline'}** synced!`,
+              embeds: embedList.slice(0, 10)
+            }));
+
+            if (item.rawTextReport) {
+              const textBlob = new Blob([item.rawTextReport], { type: 'text/plain' });
+              formData.append('files[0]', textBlob, `Activity_Timeline_${(item.dateFormatted || 'Log').replace(/[^a-zA-Z0-9]/g, '_')}.txt`);
+            }
+
             const res = await fetch(this.webhookUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                username: `${item.username || 'User'} (ActionDash)`,
-                content: `📊 Queued device analytics for **${item.embed.title || 'Today'}** synced!`,
-                embeds: [item.embed]
-              })
+              body: formData
             });
+
             if (!res.ok) {
               remaining.push(item);
             }
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 800));
           }
         } catch (e) {
           remaining.push(item);

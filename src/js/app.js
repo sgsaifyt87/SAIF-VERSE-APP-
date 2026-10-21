@@ -27,7 +27,7 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.5');
+    this.updaterService = new UpdaterService('v1.0.6');
     this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
     this.currentAnalyticsData = null;
 

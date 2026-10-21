@@ -1,7 +1,7 @@
 {
-  "version": "1.0.5",
-  "title": "SAIF-VERSE Update v1.0.5 — Exact Session Intervals & Community Sync",
-  "changelog": "🌸 What's New in v1.0.5:\n• Exact when-to-when session intervals for every app launch\n• Emulator & phone screen unlock detection with wake timestamps\n• Re-introduced one-tap Community Sync button alongside automatic daily push\n• Detailed session drawer under each application in Activity tab\n• Full offline queue safety preserving all session timestamps",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.5.apk",
+  "version": "1.0.6",
+  "title": "SAIF-VERSE Update v1.0.6 — 100% Unabridged Activity Timeline",
+  "changelog": "🌸 What's New in v1.0.6:\n• 100% full screen unlock timestamps without truncation (+more removed)\n• Complete when-to-when session intervals for every single app launch\n• All other installed phone applications listed in full\n• Raw Activity_Timeline.txt document attached directly to Discord webhook\n• Enhanced emulator & physical device screen wake event detection",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.6.apk",
   "releaseDate": "2026-10-22"
 }
