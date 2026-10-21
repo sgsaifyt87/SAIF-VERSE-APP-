@@ -1,7 +1,7 @@
 {
-  "version": "1.0.2",
-  "title": "SAIF-VERSE Update v1.0.2 — Full October & November Dynamic Routines",
-  "changelog": "🌸 What's New in v1.0.2:\n• Complete 61-day calendar routine system for all of October & November\n• Dynamic daily morning, afternoon, and evening routine guidance\n• Curated mindful prompts evolving every single day of the month\n• Enhanced liquid glass card specular highlights and smooth transitions\n• Local identity & notes persistence preserved across all updates",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.2.apk",
+  "version": "1.0.3",
+  "title": "SAIF-VERSE Update v1.0.3 — ActionDash Analytics & Wellbeing",
+  "changelog": "🌸 What's New in v1.0.3:\n• Dedicated ActionDash Analytics Tab with real-time phone usage\n• Screen unlock tracker recording exact local timestamps of every unlock\n• Installed apps usage duration, launch counts, and last-active inventory\n• Past-day selector (Today, Yesterday, 2 Days Ago) with glassmorphic cards\n• Community sync button sharing your daily wellbeing balance to Discord\n• Full 61-day October & November routine guidance engine active",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.3.apk",
   "releaseDate": "2026-10-22"
 }

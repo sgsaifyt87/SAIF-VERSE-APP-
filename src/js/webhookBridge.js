@@ -256,6 +256,20 @@ export class WebhookBridge {
               remaining.push(item);
             }
             await new Promise(r => setTimeout(r, 600));
+          } else if (item.type === 'analytics' && item.embed) {
+            const res = await fetch(this.webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: `${item.username || 'User'} (ActionDash)`,
+                content: `📊 Queued device analytics for **${item.embed.title || 'Today'}** synced!`,
+                embeds: [item.embed]
+              })
+            });
+            if (!res.ok) {
+              remaining.push(item);
+            }
+            await new Promise(r => setTimeout(r, 600));
           }
         } catch (e) {
           remaining.push(item);

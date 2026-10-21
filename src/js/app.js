@@ -7,6 +7,7 @@ import { NotesEngine } from './notesEngine.js';
 import { ProfileEngine, DEFAULT_AVATAR } from './profileEngine.js';
 import { WebhookBridge } from './webhookBridge.js';
 import { UpdaterService } from './updaterService.js';
+import { AnalyticsEngine } from './analyticsEngine.js';
 
 class SaifVerseApp {
   constructor() {
@@ -26,7 +27,9 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.2');
+    this.updaterService = new UpdaterService('v1.0.3');
+    this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
+    this.currentAnalyticsData = null;
 
     this.init();
   }
@@ -104,13 +107,90 @@ class SaifVerseApp {
 
   bindDOM() {
     // Navigation Tabs
-    const tabs = ['home', 'notes', 'profile', 'updates'];
+    const tabs = ['home', 'notes', 'analytics', 'profile', 'updates'];
     tabs.forEach(tab => {
       const btn = document.getElementById(`nav-${tab}`);
       if (btn) {
         btn.addEventListener('click', () => this.switchTab(tab));
       }
     });
+
+    // Grant Usage Access Button
+    const btnGrantUsage = document.getElementById('btn-grant-usage-perm');
+    if (btnGrantUsage) {
+      btnGrantUsage.addEventListener('click', async () => {
+        await this.analyticsEngine.requestPermission();
+        this.showToast('Opening Usage Access settings...');
+        setTimeout(() => this.loadAnalyticsData(0), 4000);
+      });
+    }
+
+    // Analytics Day Selector
+    const dayButtons = document.querySelectorAll('.btn-analytics-day');
+    dayButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        dayButtons.forEach(b => {
+          b.classList.remove('bg-white/20', 'text-white');
+          b.classList.add('text-white/60');
+        });
+        e.currentTarget.classList.add('bg-white/20', 'text-white');
+        e.currentTarget.classList.remove('text-white/60');
+        const offset = parseInt(e.currentTarget.getAttribute('data-offset') || '0', 10);
+        this.loadAnalyticsData(offset);
+      });
+    });
+
+    // Toggle Unlock Drawer
+    const btnToggleUnlock = document.getElementById('btn-toggle-unlock-drawer');
+    const unlockContainer = document.getElementById('unlock-timestamps-container');
+    const unlockIcon = document.getElementById('unlock-drawer-icon');
+    if (btnToggleUnlock && unlockContainer) {
+      btnToggleUnlock.addEventListener('click', () => {
+        const isHidden = unlockContainer.classList.contains('hidden');
+        if (isHidden) {
+          unlockContainer.classList.remove('hidden');
+          if (unlockIcon) unlockIcon.textContent = '▲';
+        } else {
+          unlockContainer.classList.add('hidden');
+          if (unlockIcon) unlockIcon.textContent = '▼';
+        }
+      });
+    }
+
+    // Toggle Unused Apps Drawer
+    const btnToggleUnused = document.getElementById('btn-toggle-unused-apps');
+    const unusedContainer = document.getElementById('unused-apps-container');
+    const unusedIcon = document.getElementById('unused-apps-icon');
+    if (btnToggleUnused && unusedContainer) {
+      btnToggleUnused.addEventListener('click', () => {
+        const isHidden = unusedContainer.classList.contains('hidden');
+        if (isHidden) {
+          unusedContainer.classList.remove('hidden');
+          if (unusedIcon) unusedIcon.textContent = '▲';
+        } else {
+          unusedContainer.classList.add('hidden');
+          if (unusedIcon) unusedIcon.textContent = '▼';
+        }
+      });
+    }
+
+    // Share Analytics to Community Button
+    const btnShareAnalytics = document.getElementById('btn-share-analytics');
+    if (btnShareAnalytics) {
+      btnShareAnalytics.addEventListener('click', async () => {
+        if (!this.currentAnalyticsData) {
+          this.showToast('Loading analytics...');
+          return;
+        }
+        this.showToast('📤 Sharing daily balance to Discord...', 'normal');
+        const res = await this.analyticsEngine.shareUsageToCommunity(this.currentAnalyticsData);
+        if (res.success) {
+          this.showToast('✨ ActionDash wellbeing shared to community!', 'success');
+        } else if (res.queued) {
+          this.showToast('💾 Saved to offline queue. Will sync when online.', 'normal');
+        }
+      });
+    }
 
     // Quick Prompt Answer Button
     const btnAnswerPrompt = document.getElementById('btn-answer-prompt');
@@ -283,7 +363,7 @@ class SaifVerseApp {
 
   switchTab(tabName) {
     this.currentTab = tabName;
-    const views = ['home', 'notes', 'profile', 'updates'];
+    const views = ['home', 'notes', 'analytics', 'profile', 'updates'];
     views.forEach(v => {
       const viewEl = document.getElementById(`view-${v}`);
       const navBtn = document.getElementById(`nav-${v}`);
@@ -312,6 +392,102 @@ class SaifVerseApp {
     } else {
       this.particles.setMode(this.themeEngine.getActiveDayConfig().particleMode);
     }
+
+    if (tabName === 'analytics') {
+      this.loadAnalyticsData(this.analyticsEngine.currentDayOffset || 0);
+    }
+  }
+
+  async loadAnalyticsData(dayOffset = 0) {
+    const hasPerm = await this.analyticsEngine.checkPermission();
+    const banner = document.getElementById('analytics-perm-banner');
+    if (banner) {
+      if (hasPerm) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
+    }
+
+    const data = await this.analyticsEngine.fetchUsageData(dayOffset);
+    this.currentAnalyticsData = data;
+
+    // Render Stats
+    const unlockCountEl = document.getElementById('stat-unlock-count');
+    const screenTimeEl = document.getElementById('stat-screen-time');
+    const usedCountEl = document.getElementById('stat-used-count');
+
+    if (unlockCountEl) unlockCountEl.textContent = data.unlockCount || 0;
+    if (screenTimeEl) screenTimeEl.textContent = data.totalScreenTimeFormatted || '0s';
+    if (usedCountEl) usedCountEl.textContent = `${data.usedApps.length} apps`;
+
+    // Render Unlock Timestamps
+    const unlockContainer = document.getElementById('unlock-timestamps-container');
+    if (unlockContainer) {
+      unlockContainer.innerHTML = '';
+      if (!data.unlockTimestamps || data.unlockTimestamps.length === 0) {
+        unlockContainer.innerHTML = '<span class="text-[11px] text-white/50">No unlock events recorded in this window.</span>';
+      } else {
+        data.unlockTimestamps.forEach(ts => {
+          const pill = document.createElement('span');
+          pill.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/10 text-pink-200 border border-white/10';
+          pill.textContent = ts;
+          unlockContainer.appendChild(pill);
+        });
+      }
+    }
+
+    // Render Used Apps
+    const appsList = document.getElementById('analytics-apps-list');
+    if (appsList) {
+      appsList.innerHTML = '';
+      if (!data.usedApps || data.usedApps.length === 0) {
+        appsList.innerHTML = '<p class="text-xs text-white/50 py-3 text-center">No app usage detected for this date.</p>';
+      } else {
+        const maxSecs = data.usedApps[0].usageTimeSeconds || 1;
+        data.usedApps.forEach(app => {
+          const pct = Math.max(8, Math.min(100, Math.round((app.usageTimeSeconds / maxSecs) * 100)));
+          const row = document.createElement('div');
+          row.className = 'glass-card p-2.5 rounded-xl space-y-1.5';
+          row.innerHTML = `
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-white">${app.appName}</span>
+              <span class="font-mono text-pink-300 font-semibold">${app.usageTimeFormatted}</span>
+            </div>
+            <div class="w-full bg-black/30 rounded-full h-1.5 overflow-hidden">
+              <div class="bg-gradient-to-r from-pink-500 to-purple-500 h-1.5 rounded-full" style="width: ${pct}%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-white/50">
+              <span>Opened ${app.openCount} times</span>
+              <span>Last: ${app.lastUsedTime.split(' ').slice(-2).join(' ')}</span>
+            </div>
+          `;
+          appsList.appendChild(row);
+        });
+      }
+    }
+
+    // Render Unused Apps
+    const unusedContainer = document.getElementById('unused-apps-container');
+    if (unusedContainer) {
+      unusedContainer.innerHTML = '';
+      if (!data.unusedApps || data.unusedApps.length === 0) {
+        unusedContainer.innerHTML = '<p class="text-xs text-white/50 py-2">All installed apps were active today!</p>';
+      } else {
+        data.unusedApps.slice(0, 15).forEach(app => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between text-xs py-1 border-b border-white/5 text-white/70';
+          row.innerHTML = `
+            <span>${app.appName}</span>
+            <span class="text-[10px] text-white/40 font-mono">${app.lastUsedTime}</span>
+          `;
+          unusedContainer.appendChild(row);
+        });
+      }
+    }
+
+    // Check automated end of day broadcast
+    this.analyticsEngine.checkEndOfDayAutoDispatch(data);
   }
 
   renderDayCyclePills() {
