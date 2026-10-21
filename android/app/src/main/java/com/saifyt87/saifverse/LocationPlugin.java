@@ -235,6 +235,21 @@ public class LocationPlugin extends Plugin {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a", Locale.getDefault());
         String formattedTime = sdf.format(new Date(loc.getTime() > 0 ? loc.getTime() : System.currentTimeMillis()));
 
+        boolean isMock = false;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            isMock = loc.isMock();
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            isMock = loc.isFromMockProvider();
+        }
+
+        // Also detect BlueStacks / emulator common fingerprints
+        boolean isEmulator = android.os.Build.HARDWARE.contains("goldfish") ||
+                             android.os.Build.HARDWARE.contains("ranchu") ||
+                             android.os.Build.PRODUCT.contains("vbox86p") ||
+                             android.os.Build.PRODUCT.contains("BlueStacks") ||
+                             android.os.Build.FINGERPRINT.contains("generic");
+
+        obj.put("isMock", isMock || isEmulator);
         obj.put("granted", true);
         obj.put("hasLocation", true);
         obj.put("latitude", lat);
