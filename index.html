@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<!-- path: index.html -->
+<!-- context: html5 / index.html / browser-runtime / target: mobile-android -->
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>SAIF-VERSE</title>
+  <link rel="stylesheet" href="./src/styles/main.css" />
+  <meta name="theme-color" content="#090a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+<body class="bg-[#090a0f] text-slate-100 flex flex-col h-screen overflow-hidden select-none">
+
+  <!-- Ambient Light Orbs for Liquid Glass Glow -->
+  <div id="ambient-orb-1" class="ambient-orb w-80 h-80 -top-20 -left-20 bg-pink-600/30"></div>
+  <div id="ambient-orb-2" class="ambient-orb w-96 h-96 top-1/2 -right-32 bg-purple-600/25"></div>
+  <div id="ambient-orb-3" class="ambient-orb w-72 h-72 -bottom-20 left-1/4 bg-blue-600/20"></div>
+
+  <!-- Live Dynamic Canvas Engine (Cherry Blossoms & Particles) -->
+  <canvas id="particle-canvas" class="fixed inset-0 pointer-events-auto z-0"></canvas>
+
+  <!-- Main Container -->
+  <div class="relative z-10 flex flex-col h-full max-w-md mx-auto w-full pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] px-4">
+
+    <!-- Top App Bar -->
+    <header class="flex items-center justify-between mb-3 px-1">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl glass-card flex items-center justify-center p-0.5 border border-white/20 shadow-md overflow-hidden">
+          <img src="" class="user-avatar-img w-full h-full object-cover rounded-lg" alt="Avatar" />
+        </div>
+        <div>
+          <span class="text-[10px] uppercase font-bold tracking-widest text-pink-400">SAIF-VERSE</span>
+          <h1 class="text-sm font-semibold text-white/90 user-display-name">Welcome, Explorer</h1>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <!-- Offline sync status pill -->
+        <span id="sync-status-pill" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          Offline Mode
+        </span>
+
+        <button id="btn-auto-day" title="Sync with Real Time" class="glass-card px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white flex items-center space-x-1">
+          <span>Auto</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Background Battery Whitelist Alert Banner (Shows if not granted) -->
+    <div id="battery-banner" class="hidden mb-3 p-3 rounded-2xl glass-card border border-pink-500/30 bg-gradient-to-r from-pink-500/15 to-purple-500/10 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5 pr-2">
+        <span class="text-base">⚡</span>
+        <div>
+          <h4 class="text-xs font-bold text-white">Always Active Mode</h4>
+          <p class="text-[10px] text-white/70">Disable battery restriction for uninterrupted background notes sync.</p>
+        </div>
+      </div>
+      <button id="btn-enable-battery-opt" class="glass-button px-3 py-1.5 text-[10px] whitespace-nowrap">
+        Allow
+      </button>
+    </div>
+
+    <!-- 7-Day Cycle Interactive Pills Slider -->
+    <div class="mb-3 overflow-x-auto no-scrollbar py-0.5">
+      <div id="day-pills-container" class="flex items-center space-x-2"></div>
+    </div>
+
+    <!-- Content Views Area -->
+    <main class="flex-1 overflow-y-auto overflow-x-hidden relative pr-0.5">
+
+      <!-- VIEW 1: HOME / TODAY -->
+      <section id="view-home" class="flex flex-col space-y-4">
+
+        <!-- Daily Prompt & Greeting Hero Card -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+          <div class="flex items-center justify-between mb-3">
+            <span id="home-day-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide uppercase bg-white/10 text-pink-300 border border-white/15">
+              Daily Pulse
+            </span>
+            <span id="home-day-name" class="text-xs font-bold text-white/80 tracking-wider">Sunday</span>
+          </div>
+
+          <h2 id="home-greeting" class="text-xl font-bold text-white mb-2 tracking-tight">Peaceful Sunday</h2>
+
+          <div class="p-4 rounded-xl bg-black/20 border border-white/10 mb-4 backdrop-blur-md">
+            <p id="home-prompt-text" class="text-sm text-pink-100 font-medium leading-relaxed italic">
+              "Sunday reflection: How are you feeling today? Everything was good? How about your relationship and personal connections?"
+            </p>
+          </div>
+
+          <button id="btn-answer-prompt" class="glass-button w-full py-3 text-sm flex items-center justify-center space-x-2">
+            <span>✨</span>
+            <span>Reflect & Share to Community</span>
+          </button>
+        </div>
+
+        <!-- Quick Stats Glass Row -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass-card p-3.5 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 text-lg font-bold border border-pink-500/30">
+              📝
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-white/50 tracking-wider">Total Notes</span>
+              <p id="notes-total-count" class="text-lg font-bold text-white">0</p>
+            </div>
+          </div>
+
+          <div class="glass-card p-3.5 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 text-lg font-bold border border-purple-500/30">
+              🌸
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-white/50 tracking-wider">Atmosphere</span>
+              <p class="text-xs font-semibold text-white/90">Liquid Glass</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Community Sync Status Card -->
+        <div class="glass-card p-4 space-y-2 border border-emerald-500/20 bg-emerald-500/5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-xs font-semibold text-emerald-400">
+              <span>🌐</span>
+              <span>Discord Community Sync</span>
+            </div>
+            <span id="offline-queue-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
+              Connected
+            </span>
+          </div>
+          <p class="text-[11px] text-white/70 leading-relaxed">
+            All notes you create or update automatically broadcast to our Discord channel. If you are offline, notes queue safely and auto-sync the instant internet reconnects!
+          </p>
+        </div>
+
+      </section>
+
+      <!-- VIEW 2: NOTES JOURNAL -->
+      <section id="view-notes" class="hidden flex-col space-y-3 pb-8">
+        <!-- Search and Action Bar -->
+        <div class="flex items-center space-x-2">
+          <div class="relative flex-1">
+            <input id="notes-search-input" type="text" placeholder="Search your reflections..." class="glass-input w-full px-3.5 py-2.5 text-xs placeholder-white/40" />
+          </div>
+          <button id="fab-new-note" class="glass-button px-4 py-2.5 text-xs flex items-center space-x-1.5 shadow-md">
+            <span>+</span>
+            <span>New Note</span>
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div id="notes-empty-state" class="hidden text-center py-16 px-4">
+          <div class="w-16 h-16 mx-auto mb-3 rounded-2xl glass-card flex items-center justify-center text-2xl">
+            ✍️
+          </div>
+          <h3 class="text-sm font-semibold text-white">No Notes Found</h3>
+          <p class="text-xs text-white/50 mt-1 max-w-xs mx-auto">Write your first reflection or answer today's prompt to share with the community.</p>
+        </div>
+
+        <!-- Notes Grid -->
+        <div id="notes-grid-container" class="grid grid-cols-1 gap-2.5"></div>
+      </section>
+
+      <!-- VIEW 3: PROFILE & IDENTITY -->
+      <section id="view-profile" class="hidden flex-col space-y-4">
+        <!-- Profile Showcase Card with Glass Halo -->
+        <div class="glass-panel p-6 text-center relative overflow-hidden">
+          <div class="relative w-24 h-24 mx-auto mb-3">
+            <div class="absolute inset-0 rounded-full bg-pink-500/40 blur-xl animate-pulse"></div>
+            <img src="" class="user-avatar-img relative w-24 h-24 rounded-full object-cover border-2 border-white/40 shadow-xl" alt="Profile avatar" />
+          </div>
+
+          <h2 class="text-lg font-bold text-white user-display-name">Creator Name</h2>
+          <p class="text-xs text-pink-300 font-medium mt-0.5">SAIF-VERSE Member</p>
+
+          <p class="text-xs text-white/70 italic mt-3 px-4 user-bio-text leading-relaxed">
+            "Wanderer in the SAIF-VERSE ✨"
+          </p>
+
+          <div class="mt-5 flex items-center justify-center space-x-3">
+            <button id="btn-edit-profile" class="glass-button px-5 py-2 text-xs font-semibold shadow-md">
+              Change Photo & Name
+            </button>
+          </div>
+        </div>
+
+        <!-- Background Execution & Battery Health Card -->
+        <div class="glass-card p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-xs font-semibold text-yellow-400">
+              <span>🔋</span>
+              <span>Always Active Background Engine</span>
+            </div>
+            <span id="battery-status-tag" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-300">Active</span>
+          </div>
+          <p class="text-[11px] text-white/60 leading-relaxed">
+            SAIF-VERSE maintains active background sync listeners with battery optimization exemption, ensuring your daily prompts and notes stay ready without OS sleeping.
+          </p>
+        </div>
+
+        <!-- Animation & Aesthetic Settings Card -->
+        <div class="glass-card p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-white">Live Sakura Canvas</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/20 text-pink-400 border border-pink-500/30">60 FPS</span>
+          </div>
+          <p class="text-[11px] text-white/60 leading-relaxed">
+            Falling cherry blossom petal dynamics with fluid wind sway and touch-responsive gusts.
+          </p>
+        </div>
+      </section>
+
+      <!-- VIEW 4: UPDATES & GITHUB SYNC -->
+      <section id="view-updates" class="hidden flex-col space-y-4">
+        <!-- Repository Card -->
+        <div class="glass-panel p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-purple-400">GitHub Sync</span>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white/80 border border-white/15">v1.0.1</span>
+          </div>
+
+          <h2 class="text-base font-bold text-white">SAIF-VERSE Official Distribution</h2>
+          <p class="text-xs text-white/70 leading-relaxed">
+            Connected to repository: <span class="text-pink-300 font-mono text-[11px]">sgsaifyt87/SAIF-VERSE-APP-</span>
+          </p>
+
+          <button id="btn-manual-check-update" class="glass-button w-full py-2.5 text-xs flex items-center justify-center space-x-1.5">
+            <span>⚡</span>
+            <span>Check for Latest Release</span>
+          </button>
+
+          <p id="update-status-text" class="text-[11px] text-center text-white/60 italic"></p>
+        </div>
+
+        <!-- Result Card -->
+        <div id="update-result-card" class="hidden glass-card p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-emerald-400">Release Information</span>
+          </div>
+          <p id="update-changelog-text" class="text-xs text-white/70 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto"></p>
+          <button id="btn-download-update" class="glass-button w-full py-2.5 text-xs bg-emerald-500/80 hover:bg-emerald-600">
+            Download / Install Update
+          </button>
+        </div>
+
+        <!-- Technical Information -->
+        <div class="glass-card p-4 text-[11px] text-white/60 space-y-1.5">
+          <div class="flex justify-between"><span>Architecture:</span><span class="text-white/80">Universal Android (API 26+)</span></div>
+          <div class="flex justify-between"><span>Background Active:</span><span class="text-white/80">WAKELOCK + Battery Exemption</span></div>
+          <div class="flex justify-between"><span>Discord Bridge:</span><span class="text-emerald-400">Active (Auto-Sync)</span></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar (Glass Floating Nav) -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass-nav px-6 py-2.5 flex items-center justify-around z-20">
+      <button id="nav-home" class="flex flex-col items-center space-y-1 text-white scale-110 transition-transform">
+        <span class="text-lg">🏠</span>
+        <span class="text-[10px] font-semibold">Today</span>
+      </button>
+
+      <button id="nav-notes" class="flex flex-col items-center space-y-1 text-gray-400 hover:text-white transition-all">
+        <span class="text-lg">📓</span>
+        <span class="text-[10px] font-semibold">Notes</span>
+      </button>
+
+      <button id="nav-profile" class="flex flex-col items-center space-y-1 text-gray-400 hover:text-white transition-all">
+        <span class="text-lg">👤</span>
+        <span class="text-[10px] font-semibold">Profile</span>
+      </button>
+
+      <button id="nav-updates" class="relative flex flex-col items-center space-y-1 text-gray-400 hover:text-white transition-all">
+        <span class="text-lg">🚀</span>
+        <span class="text-[10px] font-semibold">Updates</span>
+        <span id="nav-update-dot" class="hidden absolute top-0 right-1 w-2 h-2 rounded-full bg-pink-500 animate-ping"></span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODAL: NOTE EDITOR -->
+  <div id="note-editor-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-5 flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <span class="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Discord Community Note</span>
+          <h3 class="text-sm font-bold text-white">Write Reflection</h3>
+        </div>
+        <button id="btn-close-note-modal" class="text-white/60 hover:text-white text-lg p-1">✕</button>
+      </div>
+
+      <input id="input-note-title" type="text" placeholder="Title (e.g. My thoughts today)" class="glass-input w-full px-3.5 py-2.5 text-sm mb-3" />
+
+      <div class="mb-3">
+        <select id="select-note-category" class="glass-input w-full px-3.5 py-2 text-xs">
+          <option value="Thoughts" class="bg-gray-900 text-white">Thoughts</option>
+          <option value="Reflection" class="bg-gray-900 text-white">Daily Reflection</option>
+          <option value="Relationship" class="bg-gray-900 text-white">Relationship & Bonds</option>
+          <option value="Goals" class="bg-gray-900 text-white">Goals & Ambition</option>
+          <option value="Creative" class="bg-gray-900 text-white">Creative Ideas</option>
+        </select>
+      </div>
+
+      <textarea id="input-note-content" placeholder="Pour your thoughts into the glass... (Syncs to Discord community)" rows="7" class="glass-input w-full p-3.5 text-xs leading-relaxed flex-1 mb-4 resize-none"></textarea>
+
+      <div class="flex items-center space-x-2">
+        <button id="btn-save-note" class="glass-button flex-1 py-3 text-xs flex items-center justify-center space-x-1.5">
+          <span>💾</span>
+          <span>Save & Sync to Discord</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PROFILE SETUP / GALLERY UPLOAD -->
+  <div id="profile-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-5 flex flex-col max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Identity</span>
+          <h3 class="text-sm font-bold text-white">Profile & Photo</h3>
+        </div>
+        <button id="btn-close-profile-modal" class="text-white/60 hover:text-white text-lg p-1">✕</button>
+      </div>
+
+      <!-- Avatar Preview with Gallery Trigger -->
+      <div class="text-center my-3">
+        <div class="relative w-24 h-24 mx-auto group cursor-pointer" id="avatar-preview-container">
+          <img id="profile-edit-avatar-preview" src="" class="w-24 h-24 rounded-full object-cover border-2 border-pink-400 shadow-xl mx-auto" />
+          <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+            <span class="text-xs text-white font-semibold">Change</span>
+          </div>
+        </div>
+
+        <!-- Hidden Native File Input for Gallery -->
+        <input type="file" id="input-profile-gallery-file" accept="image/*" class="hidden" />
+
+        <div class="mt-3">
+          <button id="btn-trigger-gallery-pick" type="button" class="glass-card px-4 py-2 text-xs font-semibold text-white/90 hover:text-white border border-pink-400/40 flex items-center justify-center space-x-1.5 mx-auto">
+            <span>🖼️</span>
+            <span>Upload Photo from Gallery</span>
+          </button>
+          <p class="text-[10px] text-white/50 mt-1.5">Choose any picture from your device gallery</p>
+        </div>
+      </div>
+
+      <!-- Name -->
+      <div class="mb-3">
+        <label class="text-[11px] font-semibold text-white/70 block mb-1">Your Name</label>
+        <input id="input-profile-username" type="text" placeholder="e.g. Saif" class="glass-input w-full px-3 py-2 text-xs" />
+      </div>
+
+      <!-- Bio -->
+      <div class="mb-4">
+        <label class="text-[11px] font-semibold text-white/70 block mb-1">Bio / Status</label>
+        <textarea id="input-profile-bio" rows="2" placeholder="Tell the universe who you are..." class="glass-input w-full px-3 py-2 text-xs resize-none"></textarea>
+      </div>
+
+      <button id="btn-save-profile" class="glass-button w-full py-3 text-xs">
+        Save & Enter SAIF-VERSE ✨
+      </button>
+    </div>
+  </div>
+
+  <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "appId": "com.saifyt87.saifverse",
+  "appName": "SAIF-VERSE",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DARK"
+    }
+  }
+}
