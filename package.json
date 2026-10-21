@@ -1,6 +1,6 @@
 {
   "name": "saif-verse-app",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "SAIF-VERSE Mobile Android App with Liquid Glass, Dynamic Daily Themes, Cherry Blossom Live Engine, Notes & GitHub Updater",
   "private": true,

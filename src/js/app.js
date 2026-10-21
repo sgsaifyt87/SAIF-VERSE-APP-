@@ -26,7 +26,7 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.1');
+    this.updaterService = new UpdaterService('v1.0.2');
 
     this.init();
   }
@@ -117,9 +117,10 @@ class SaifVerseApp {
     if (btnAnswerPrompt) {
       btnAnswerPrompt.addEventListener('click', () => {
         const config = this.themeEngine.getActiveDayConfig();
+        const routineData = this.themeEngine.getTodayCalendarRoutine();
         this.openNoteEditor({
-          title: `${config.name} Reflection`,
-          content: `Reflecting on: "${config.prompt}"\n\n`,
+          title: `${routineData.title}`,
+          content: `Focus: ${routineData.routine}\n\nReflection Prompt:\n"${routineData.prompt}"\n\nMy Thoughts:\n`,
           dayTag: config.name,
           category: 'Reflection'
         });
@@ -350,12 +351,24 @@ class SaifVerseApp {
     const greetingEl = document.getElementById('home-greeting');
     const dayNameEl = document.getElementById('home-day-name');
     const badgeEl = document.getElementById('home-day-badge');
+    const calendarDateEl = document.getElementById('home-calendar-date');
+    const routineTextEl = document.getElementById('home-routine-text');
     const promptTextEl = document.getElementById('home-prompt-text');
 
-    if (greetingEl) greetingEl.textContent = config.greeting;
+    const routineData = this.themeEngine.getTodayCalendarRoutine();
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+
+    if (calendarDateEl) calendarDateEl.textContent = formattedDate;
     if (dayNameEl) dayNameEl.textContent = config.name;
     if (badgeEl) badgeEl.textContent = config.badge;
-    if (promptTextEl) promptTextEl.textContent = `"${config.prompt}"`;
+    if (greetingEl) greetingEl.textContent = routineData.title;
+    if (routineTextEl) routineTextEl.textContent = routineData.routine;
+    if (promptTextEl) promptTextEl.textContent = `"${routineData.prompt}"`;
   }
 
   onProfileChanged(profile) {
