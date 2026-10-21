@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.ag_buf.txt
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+.DS_Store
+Thumbs.db
