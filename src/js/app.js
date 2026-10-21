@@ -27,7 +27,7 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.3');
+    this.updaterService = new UpdaterService('v1.0.4');
     this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
     this.currentAnalyticsData = null;
 
@@ -170,24 +170,6 @@ class SaifVerseApp {
         } else {
           unusedContainer.classList.add('hidden');
           if (unusedIcon) unusedIcon.textContent = '▼';
-        }
-      });
-    }
-
-    // Share Analytics to Community Button
-    const btnShareAnalytics = document.getElementById('btn-share-analytics');
-    if (btnShareAnalytics) {
-      btnShareAnalytics.addEventListener('click', async () => {
-        if (!this.currentAnalyticsData) {
-          this.showToast('Loading analytics...');
-          return;
-        }
-        this.showToast('📤 Sharing daily balance to Discord...', 'normal');
-        const res = await this.analyticsEngine.shareUsageToCommunity(this.currentAnalyticsData);
-        if (res.success) {
-          this.showToast('✨ ActionDash wellbeing shared to community!', 'success');
-        } else if (res.queued) {
-          this.showToast('💾 Saved to offline queue. Will sync when online.', 'normal');
         }
       });
     }
@@ -417,15 +399,17 @@ class SaifVerseApp {
     const screenTimeEl = document.getElementById('stat-screen-time');
     const usedCountEl = document.getElementById('stat-used-count');
 
-    if (unlockCountEl) unlockCountEl.textContent = data.unlockCount || 0;
-    if (screenTimeEl) screenTimeEl.textContent = data.totalScreenTimeFormatted || '0s';
-    if (usedCountEl) usedCountEl.textContent = `${data.usedApps.length} apps`;
+    if (unlockCountEl) unlockCountEl.textContent = data.granted ? (data.unlockCount || 0) : '--';
+    if (screenTimeEl) screenTimeEl.textContent = data.granted ? (data.totalScreenTimeFormatted || '0s') : '--';
+    if (usedCountEl) usedCountEl.textContent = data.granted ? `${data.usedApps.length} apps` : 'Permission needed';
 
     // Render Unlock Timestamps
     const unlockContainer = document.getElementById('unlock-timestamps-container');
     if (unlockContainer) {
       unlockContainer.innerHTML = '';
-      if (!data.unlockTimestamps || data.unlockTimestamps.length === 0) {
+      if (!data.granted) {
+        unlockContainer.innerHTML = '<span class="text-[11px] text-white/50">Allow Usage Access to view exact unlock timestamps.</span>';
+      } else if (!data.unlockTimestamps || data.unlockTimestamps.length === 0) {
         unlockContainer.innerHTML = '<span class="text-[11px] text-white/50">No unlock events recorded in this window.</span>';
       } else {
         data.unlockTimestamps.forEach(ts => {
@@ -441,7 +425,24 @@ class SaifVerseApp {
     const appsList = document.getElementById('analytics-apps-list');
     if (appsList) {
       appsList.innerHTML = '';
-      if (!data.usedApps || data.usedApps.length === 0) {
+      if (!data.granted) {
+        appsList.innerHTML = `
+          <div class="p-6 text-center space-y-3">
+            <div class="text-3xl">🔒</div>
+            <h4 class="text-xs font-bold text-white">Usage Access Permission Required</h4>
+            <p class="text-[11px] text-white/60">Android requires permission to read your real phone usage, screen unlocks, and installed apps.</p>
+            <button id="btn-empty-enable-perm" class="glass-button px-4 py-2 text-xs">Allow Usage Access</button>
+          </div>
+        `;
+        const ctaBtn = document.getElementById('btn-empty-enable-perm');
+        if (ctaBtn) {
+          ctaBtn.addEventListener('click', async () => {
+            await this.analyticsEngine.requestPermission();
+            this.showToast('Opening Android Usage Settings...');
+            setTimeout(() => this.loadAnalyticsData(dayOffset), 4000);
+          });
+        }
+      } else if (!data.usedApps || data.usedApps.length === 0) {
         appsList.innerHTML = '<p class="text-xs text-white/50 py-3 text-center">No app usage detected for this date.</p>';
       } else {
         const maxSecs = data.usedApps[0].usageTimeSeconds || 1;
@@ -471,10 +472,12 @@ class SaifVerseApp {
     const unusedContainer = document.getElementById('unused-apps-container');
     if (unusedContainer) {
       unusedContainer.innerHTML = '';
-      if (!data.unusedApps || data.unusedApps.length === 0) {
+      if (!data.granted) {
+        unusedContainer.innerHTML = '<p class="text-xs text-white/50 py-2">Enable usage permission above to view installed apps.</p>';
+      } else if (!data.unusedApps || data.unusedApps.length === 0) {
         unusedContainer.innerHTML = '<p class="text-xs text-white/50 py-2">All installed apps were active today!</p>';
       } else {
-        data.unusedApps.slice(0, 15).forEach(app => {
+        data.unusedApps.slice(0, 20).forEach(app => {
           const row = document.createElement('div');
           row.className = 'flex items-center justify-between text-xs py-1 border-b border-white/5 text-white/70';
           row.innerHTML = `
@@ -486,8 +489,10 @@ class SaifVerseApp {
       }
     }
 
-    // Check automated end of day broadcast
-    this.analyticsEngine.checkEndOfDayAutoDispatch(data);
+    // Auto-sync real data to community if available
+    if (data.granted) {
+      this.analyticsEngine.checkAndAutoShare(data);
+    }
   }
 
   renderDayCyclePills() {

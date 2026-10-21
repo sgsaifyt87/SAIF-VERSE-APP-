@@ -1,41 +1,45 @@
 // path: src/js/analyticsEngine.js
 // context: javascript / analyticsEngine.js / bridge / target: mobile-android
 
+import { registerPlugin } from '@capacitor/core';
+
+// Native Bridge to UsageAnalyticsPlugin.java
+const UsageAnalytics = registerPlugin('UsageAnalytics');
+
 export class AnalyticsEngine {
   constructor(webhookBridge, profileEngine) {
     this.webhookBridge = webhookBridge;
     this.profileEngine = profileEngine;
-    this.isNative = typeof window !== 'undefined' && 
-                    window.Capacitor && 
-                    window.Capacitor.isPluginAvailable && 
-                    window.Capacitor.isPluginAvailable('UsageAnalytics');
-    this.plugin = this.isNative ? window.Capacitor.Plugins.UsageAnalytics : null;
-    this.currentDayOffset = 0; // 0 = today, 1 = yesterday, 2 = 2 days ago
-    this.lastDispatchedDate = localStorage.getItem('saif_verse_last_analytics_dispatch') || '';
+    this.plugin = UsageAnalytics;
+    this.currentDayOffset = 0;
+    this.lastDispatchedDateKey = 'saif_verse_last_auto_dispatched_date';
+
+    // Auto-sync listener when network returns
+    window.addEventListener('online', () => {
+      this.triggerDailyAutoSync();
+    });
   }
 
   async checkPermission() {
-    if (this.plugin) {
-      try {
+    try {
+      if (this.plugin && this.plugin.checkPermission) {
         const res = await this.plugin.checkPermission();
         return res && res.granted === true;
-      } catch (e) {
-        console.warn('Error checking usage permission:', e);
       }
+    } catch (e) {
+      console.warn('checkPermission error:', e);
     }
     return false;
   }
 
   async requestPermission() {
-    if (this.plugin) {
-      try {
+    try {
+      if (this.plugin && this.plugin.requestPermission) {
         await this.plugin.requestPermission();
         return true;
-      } catch (e) {
-        console.warn('Error requesting usage permission:', e);
       }
-    } else {
-      alert('Usage Access settings can only be opened directly on a physical Android device or emulator.');
+    } catch (e) {
+      console.warn('requestPermission error:', e);
     }
     return false;
   }
@@ -43,25 +47,23 @@ export class AnalyticsEngine {
   async fetchUsageData(dayOffset = 0) {
     this.currentDayOffset = dayOffset;
 
-    if (this.plugin) {
-      try {
-        const hasPerm = await this.checkPermission();
-        if (hasPerm) {
-          const data = await this.plugin.getUsageData({ dayOffset });
-          if (data && data.granted) {
-            return data;
+    try {
+      if (this.plugin && this.plugin.getUsageData) {
+        const data = await this.plugin.getUsageData({ dayOffset });
+        if (data) {
+          // If native gave real response (granted or not)
+          if (data.granted) {
+            // Trigger auto-share check in background
+            this.checkAndAutoShare(data);
           }
+          return data;
         }
-      } catch (e) {
-        console.warn('Native usage stats error:', e);
       }
+    } catch (e) {
+      console.warn('getUsageData native call error:', e);
     }
 
-    // High-fidelity fallback / simulated data for preview
-    return this.getSimulatedUsageData(dayOffset);
-  }
-
-  getSimulatedUsageData(dayOffset) {
+    // Return genuine empty state — NO FAKE OR SIMULATED APPS
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() - dayOffset);
     const dateFormatted = targetDate.toLocaleDateString(undefined, {
@@ -70,114 +72,79 @@ export class AnalyticsEngine {
       year: 'numeric'
     });
 
-    const isToday = dayOffset === 0;
-    const unlockCount = isToday ? 18 : 34;
-    const screenHours = isToday ? '2h 45m' : '4h 12m';
-
-    const unlockTimestamps = isToday ? [
-      '08:15:20 AM', '09:02:11 AM', '09:44:05 AM', '10:30:18 AM',
-      '11:15:44 AM', '12:05:30 PM', '01:22:15 PM', '02:40:02 PM',
-      '03:55:19 PM', '05:12:40 PM', '06:30:22 PM', '07:45:10 PM'
-    ] : [
-      '07:30:12 AM', '08:12:45 AM', '09:05:30 AM', '10:20:11 AM',
-      '11:45:22 AM', '01:10:05 PM', '02:30:44 PM', '04:15:19 PM',
-      '06:05:55 PM', '08:20:33 PM', '10:15:40 PM', '11:45:02 PM'
-    ];
-
-    const usedApps = [
-      {
-        appName: 'SAIF-VERSE',
-        packageName: 'com.saifyt87.saifverse',
-        usageTimeSeconds: 2700,
-        usageTimeFormatted: '45m 00s',
-        openCount: 6,
-        lastUsedTime: dateFormatted + ' 11:20:00 PM',
-        openTimestamps: ['09:02:11 AM', '12:05:30 PM', '03:55:19 PM', '11:20:00 PM']
-      },
-      {
-        appName: 'YouTube',
-        packageName: 'com.google.android.youtube',
-        usageTimeSeconds: 4200,
-        usageTimeFormatted: '1h 10m',
-        openCount: 4,
-        lastUsedTime: dateFormatted + ' 07:45:10 PM',
-        openTimestamps: ['01:22:15 PM', '05:12:40 PM', '07:45:10 PM']
-      },
-      {
-        appName: 'Discord',
-        packageName: 'com.discord',
-        usageTimeSeconds: 1800,
-        usageTimeFormatted: '30m 00s',
-        openCount: 8,
-        lastUsedTime: dateFormatted + ' 06:30:22 PM',
-        openTimestamps: ['10:30:18 AM', '02:40:02 PM', '06:30:22 PM']
-      },
-      {
-        appName: 'Chrome Browser',
-        packageName: 'com.android.chrome',
-        usageTimeSeconds: 1200,
-        usageTimeFormatted: '20m 00s',
-        openCount: 3,
-        lastUsedTime: dateFormatted + ' 04:15:00 PM',
-        openTimestamps: ['09:44:05 AM', '04:15:00 PM']
-      }
-    ];
-
-    const unusedApps = [
-      {
-        appName: 'Calculator',
-        packageName: 'com.android.calculator2',
-        lastUsedTime: 'Oct 19, 2026 02:14:00 PM'
-      },
-      {
-        appName: 'Clock',
-        packageName: 'com.android.deskclock',
-        lastUsedTime: 'Oct 21, 2026 06:30:00 AM'
-      },
-      {
-        appName: 'Files',
-        packageName: 'com.google.android.documentsui',
-        lastUsedTime: 'Oct 18, 2026 11:05:00 AM'
-      }
-    ];
-
     return {
       granted: false,
-      isSimulated: true,
       dayOffset,
       dateFormatted,
-      unlockCount,
-      unlockTimestamps,
-      totalScreenTimeSeconds: isToday ? 9900 : 15120,
-      totalScreenTimeFormatted: screenHours,
-      usedApps,
-      unusedApps
+      unlockCount: 0,
+      unlockTimestamps: [],
+      totalScreenTimeSeconds: 0,
+      totalScreenTimeFormatted: '0s',
+      usedApps: [],
+      unusedApps: []
     };
   }
 
+  async checkAndAutoShare(usageData) {
+    if (!usageData || !usageData.granted) return;
+
+    // Check if we already shared today's summary
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lastShared = localStorage.getItem(this.lastDispatchedDateKey);
+
+    // Auto-share once per day if phone has activity
+    if (lastShared !== todayStr && (usageData.unlockCount > 0 || usageData.usedApps.length > 0)) {
+      console.log('Triggering automated daily usage sync to community...');
+      await this.shareUsageToCommunity(usageData);
+      localStorage.setItem(this.lastDispatchedDateKey, todayStr);
+    }
+  }
+
+  async triggerDailyAutoSync() {
+    const hasPerm = await this.checkPermission();
+    if (hasPerm) {
+      const data = await this.fetchUsageData(0);
+      if (data && data.granted) {
+        await this.shareUsageToCommunity(data);
+      }
+    }
+  }
+
   async shareUsageToCommunity(usageData) {
+    if (!usageData || !usageData.granted) return { success: false };
+
     const profile = this.profileEngine.profile;
-    const username = profile.username || 'Saif Explorer';
+    const username = profile.username || 'Saif Member';
     const avatar = profile.avatar || '';
 
-    let topAppsSummary = usageData.usedApps.slice(0, 5).map(app => 
-      `• **${app.appName}**: \`${app.usageTimeFormatted}\` (${app.openCount} opens, last at \`${app.lastUsedTime.split(' ').slice(-2).join(' ')}\`)`
+    // Build real installed apps summary
+    let topAppsSummary = usageData.usedApps.map((app, idx) => 
+      `${idx + 1}. **${app.appName}**: \`${app.usageTimeFormatted}\` (opened ${app.openCount}x, last: \`${app.lastUsedTime}\`)`
     ).join('\n');
 
     if (!topAppsSummary) {
-      topAppsSummary = 'No applications recorded in this window.';
+      topAppsSummary = 'No applications recorded in foreground.';
+    } else if (topAppsSummary.length > 1000) {
+      topAppsSummary = topAppsSummary.slice(0, 995) + '...';
     }
 
-    const unlockTimelinePreview = usageData.unlockTimestamps.slice(0, 8).join(', ') + 
-      (usageData.unlockTimestamps.length > 8 ? ` +${usageData.unlockTimestamps.length - 8} more` : '');
+    const unlockTimelinePreview = usageData.unlockTimestamps && usageData.unlockTimestamps.length > 0
+      ? usageData.unlockTimestamps.slice(0, 10).join(', ') + (usageData.unlockTimestamps.length > 10 ? ` (+${usageData.unlockTimestamps.length - 10} more)` : '')
+      : 'None recorded';
 
-    const unusedAppsSummary = usageData.unusedApps.slice(0, 4).map(app => 
+    let unusedAppsSummary = usageData.unusedApps.slice(0, 10).map(app => 
       `• ${app.appName} *(last active: ${app.lastUsedTime})*`
-    ).join('\n') || 'None';
+    ).join('\n');
+
+    if (!unusedAppsSummary) {
+      unusedAppsSummary = 'All apps active';
+    } else if (unusedAppsSummary.length > 1000) {
+      unusedAppsSummary = unusedAppsSummary.slice(0, 995) + '...';
+    }
 
     const embed = {
-      title: `📊 ActionDash Wellbeing: ${usageData.dateFormatted}`,
-      description: `**${username}**'s daily device balance & screen habits summary for **${usageData.dateFormatted}**.`,
+      title: `📊 Daily Device Usage & Activity: ${usageData.dateFormatted}`,
+      description: `Automated daily phone balance for member **${username}** on **${usageData.dateFormatted}**.`,
       color: 0x8b5cf6,
       fields: [
         {
@@ -191,23 +158,23 @@ export class AnalyticsEngine {
           inline: true
         },
         {
-          name: '🕒 Unlock Timestamps (Local Time)',
-          value: `\`${unlockTimelinePreview || 'None'}\``,
+          name: '🕒 Unlock Times (Local Device Time)',
+          value: `\`${unlockTimelinePreview}\``,
           inline: false
         },
         {
-          name: '🏆 Top Applications Used',
+          name: '📱 Apps Used Today (Duration & Times)',
           value: topAppsSummary,
           inline: false
         },
         {
-          name: '📦 Other Installed Apps on Device',
+          name: '📦 Other Installed Apps (Unused Today)',
           value: unusedAppsSummary,
           inline: false
         }
       ],
       footer: {
-        text: `ActionDash Engine • Member: ${username} • SAIF-VERSE`
+        text: `Daily Community Auto-Sync • SAIF-VERSE`
       },
       timestamp: new Date().toISOString()
     };
@@ -220,6 +187,7 @@ export class AnalyticsEngine {
     };
 
     if (!navigator.onLine) {
+      console.log('Offline: Queuing daily usage stats for Discord.');
       this.webhookBridge.enqueueItem(payloadItem);
       return { success: false, queued: true };
     }
@@ -229,32 +197,21 @@ export class AnalyticsEngine {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: `${username} (ActionDash)`,
-          content: `📊 **${username}** shared daily device usage & screen time analytics for **${usageData.dateFormatted}**!`,
+          username: `${username} (Activity)`,
+          content: `📊 **${username}**'s daily device usage & screen time for **${usageData.dateFormatted}**:`,
           embeds: [embed]
         })
       });
 
+      if (!response.ok) {
+        this.webhookBridge.enqueueItem(payloadItem);
+      }
+
       return { success: response.ok, queued: !response.ok };
     } catch (e) {
+      console.warn('Network error sharing usage stats, enqueuing offline:', e);
       this.webhookBridge.enqueueItem(payloadItem);
       return { success: false, queued: true };
-    }
-  }
-
-  checkEndOfDayAutoDispatch(usageData) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const hour = new Date().getHours();
-
-    // Auto-dispatch after 21:00 (9 PM) once per day
-    if (hour >= 21 && this.lastDispatchedDate !== todayStr) {
-      this.shareUsageToCommunity(usageData).then(res => {
-        if (res.success || res.queued) {
-          this.lastDispatchedDate = todayStr;
-          localStorage.setItem('saif_verse_last_analytics_dispatch', todayStr);
-          console.log('Automated end-of-day analytics dispatched to community.');
-        }
-      });
     }
   }
 }
