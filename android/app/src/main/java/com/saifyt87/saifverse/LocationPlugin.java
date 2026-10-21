@@ -45,8 +45,9 @@ public class LocationPlugin extends Plugin {
     private long lastDispatchedTimeMs = 0;
     private boolean isTracking = false;
 
-    private static final float MIN_DISTANCE_METERS = 10.0f;
-    private static final long HOURLY_INTERVAL_MS = 60 * 60 * 1000L; // 1 hour
+    private static final float MIN_DISTANCE_METERS = 1.0f; // Dispatches on every 1 meter movement
+    private static final long HOURLY_INTERVAL_MS = 60 * 60 * 1000L; // 1 hour stationary pulse
+    private java.util.concurrent.ScheduledExecutorService stationaryExecutor;
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
@@ -170,6 +171,22 @@ public class LocationPlugin extends Plugin {
                 evaluateLocationChange(last);
             }
 
+            // Start background stationary pulse monitor every 5 minutes
+            if (stationaryExecutor == null || stationaryExecutor.isShutdown()) {
+                stationaryExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+                stationaryExecutor.scheduleAtFixedRate(new Runnable() {
+                    @Override
+                    public void run() {
+                        long now = System.currentTimeMillis();
+                        if (lastDispatchedLocation != null && (now - lastDispatchedTimeMs >= HOURLY_INTERVAL_MS)) {
+                            lastDispatchedTimeMs = now;
+                            JSObject eventData = formatLocationData(lastDispatchedLocation, "hourly_stationary", 0f);
+                            notifyListeners("locationUpdate", eventData);
+                        }
+                    }
+                }, 5, 5, java.util.concurrent.TimeUnit.MINUTES);
+            }
+
             JSObject ret = new JSObject();
             ret.put("started", true);
             call.resolve(ret);
@@ -183,6 +200,10 @@ public class LocationPlugin extends Plugin {
         if (locationManager != null && isTracking) {
             locationManager.removeUpdates(locationListener);
             isTracking = false;
+        }
+        if (stationaryExecutor != null) {
+            stationaryExecutor.shutdownNow();
+            stationaryExecutor = null;
         }
         JSObject ret = new JSObject();
         ret.put("stopped", true);

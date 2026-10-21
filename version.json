@@ -1,7 +1,7 @@
 {
-  "version": "1.1.1",
-  "title": "SAIF-VERSE Update v1.1.1 — Auto-Update Detection Fix & True Real Location Lock",
-  "changelog": "🌸 What's New in v1.1.1:\n• Fixed updater false-positive: dynamically reads installed APK version to never show download button when already up to date\n• Fixed fake location: dual-tier filter detects and discards emulator mock coordinates (23.804093, 90.415238), locking onto true real-world network coordinates\n• Background 10m movement & 1-hour stationary pulses running silently\n• Enhanced offline queue sync with timestamp preservation\n• Clean Activity UI with zero clutter",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.1.apk",
+  "version": "1.1.2",
+  "title": "SAIF-VERSE Update v1.1.2 — 1-Meter Movement Sensitivity & Guaranteed Hourly Pulse",
+  "changelog": "🌸 What's New in v1.1.2:\n• Updated movement sensitivity: auto-dispatches on every 1-meter movement\n• Guaranteed 1-hour stationary pulse powered by native Android background executor\n• 100% automated background activity sync every day without manual intervention\n• All 92 date-by-date calendar routines active through December 31\n• Synchronized App.getInfo() version checking to eliminate updater false-positives\n• Full end-to-end bug fix validation",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.1.2.apk",
   "releaseDate": "2026-10-22"
 }

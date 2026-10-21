@@ -288,9 +288,10 @@ export class LocationEngine {
     let description = '';
     let color = 0x3b82f6; // blue
 
-    if (reason === 'moved_10m') {
-      title = `📍 Location Broadcast: Movement Detected (+${Math.round(distanceMeters)}m)`;
-      description = `**${username}** moved **${Math.round(distanceMeters)} meters**. Exact Google GPS coordinates captured:`;
+    if (reason === 'movement' || reason === 'moved_1m' || reason === 'moved_10m') {
+      const distDisplay = distanceMeters > 0 ? Math.round(distanceMeters * 10) / 10 : 1;
+      title = `📍 Location Broadcast: Movement Detected (+${distDisplay}m)`;
+      description = `**${username}** moved **+${distDisplay} meters**. Exact Google GPS coordinates captured:`;
       color = 0x10b981; // green
     } else if (reason === 'hourly_stationary') {
       title = `📍 Location Broadcast: Stationary Check-in (1 Hour Pulse)`;
@@ -304,7 +305,7 @@ export class LocationEngine {
 
     const payload = {
       username: `${username} (GPS Location)`,
-      content: `📍 **${username}** GPS Update (${reason === 'moved_10m' ? `+${Math.round(distanceMeters)}m` : '1hr check-in'}):`,
+      content: `📍 **${username}** GPS Update (${reason === 'hourly_stationary' ? '1hr check-in' : `+${Math.round((distanceMeters || 1) * 10) / 10}m move`}):`,
       embeds: [{
         title,
         description,
