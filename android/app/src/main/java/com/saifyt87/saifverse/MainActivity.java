@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(UsageAnalyticsPlugin.class);
         registerPlugin(NotificationPlugin.class);
+        registerPlugin(LocationPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

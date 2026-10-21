@@ -1,7 +1,7 @@
 {
-  "version": "1.0.8",
-  "title": "SAIF-VERSE Update v1.0.8 — Daily Greetings, Phone Notifications & December Routine",
-  "changelog": "🌸 What's New in v1.0.8:\n• Native Phone Top Notifications for all Android devices (Morning, Evening, Night & Updates)\n• Automated daily Discord community greetings with dynamic text\n• 100% background automated daily activity sync (no manual click needed)\n• Complete Date-by-Date Calendar Routine & Reflection Prompts through December 31\n• Background auto-detect updater with system status notification alerts\n• Enhanced reliability and crash protection across all mobile phone models",
-  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.8.apk",
+  "version": "1.0.9",
+  "title": "SAIF-VERSE Update v1.0.9 — Live GPS Google Coordinates & 10m Movement Engine",
+  "changelog": "🌸 What's New in v1.0.9:\n• Exact Google-formatted Latitude & Longitude in Activity reports\n• Automatic Community Dispatch whenever you move >= 10 meters\n• Stationary 1-hour pulse: broadcasts exact location every hour even if unchanged\n• Live GPS Card in Activity view with 1-tap coordinate copy and direct Google Maps link\n• Complete offline queueing for GPS tracking (auto-pushes when internet reconnects)\n• Enhanced background stability and minor bug fixes across all mobile devices",
+  "downloadUrl": "https://raw.githubusercontent.com/sgsaifyt87/SAIF-VERSE-APP-/main/SAIF-VERSE-v1.0.9.apk",
   "releaseDate": "2026-10-22"
 }

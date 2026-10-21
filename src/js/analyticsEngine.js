@@ -7,9 +7,10 @@ import { registerPlugin } from '@capacitor/core';
 const UsageAnalytics = registerPlugin('UsageAnalytics');
 
 export class AnalyticsEngine {
-  constructor(webhookBridge, profileEngine) {
+  constructor(webhookBridge, profileEngine, locationEngine = null) {
     this.webhookBridge = webhookBridge;
     this.profileEngine = profileEngine;
+    this.locationEngine = locationEngine;
     this.plugin = UsageAnalytics;
     this.currentDayOffset = 0;
     this.lastDispatchedDateKey = 'saif_verse_last_auto_dispatched_date';
@@ -157,7 +158,15 @@ export class AnalyticsEngine {
     rawTextReport += `Date: ${usageData.dateFormatted}\n`;
     rawTextReport += `User: ${username}\n`;
     rawTextReport += `Total Screen-On Time: ${usageData.totalScreenTimeFormatted}\n`;
-    rawTextReport += `Total Screen Unlocks: ${usageData.unlockCount} times\n\n`;
+    rawTextReport += `Total Screen Unlocks: ${usageData.unlockCount} times\n`;
+
+    if (this.locationEngine?.currentLocation?.hasLocation) {
+      const loc = this.locationEngine.currentLocation;
+      rawTextReport += `Current Google Coordinates: ${loc.googleFormat}\n`;
+      rawTextReport += `Google Maps Link: ${loc.googleMapsUrl}\n`;
+      rawTextReport += `Altitude: ${loc.altitude}m | Accuracy: ±${loc.accuracy}m\n`;
+    }
+    rawTextReport += `\n`;
 
     rawTextReport += `=== ALL SCREEN UNLOCK TIMESTAMPS (${usageData.unlockCount} total) ===\n`;
     if (usageData.unlockTimestamps && usageData.unlockTimestamps.length > 0) {
@@ -218,9 +227,19 @@ export class AnalyticsEngine {
         name: '🔓 Screen Unlocks',
         value: `**${usageData.unlockCount} times total**`,
         inline: true
-      },
-      ...unlockFields
+      }
     ];
+
+    if (this.locationEngine?.currentLocation?.hasLocation) {
+      const loc = this.locationEngine.currentLocation;
+      group1Fields.push({
+        name: '📍 Exact Google GPS Coordinates',
+        value: `\`${loc.googleFormat}\` ([Maps Link](${loc.googleMapsUrl}))\nAltitude: \`${loc.altitude}m\` | Accuracy: \`±${loc.accuracy}m\``,
+        inline: false
+      });
+    }
+
+    group1Fields.push(...unlockFields);
 
     messages.push({
       username: `${username} (Activity)`,

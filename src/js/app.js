@@ -9,6 +9,7 @@ import { WebhookBridge } from './webhookBridge.js';
 import { UpdaterService } from './updaterService.js';
 import { AnalyticsEngine } from './analyticsEngine.js';
 import { NotificationService } from './notificationService.js';
+import { LocationEngine } from './locationEngine.js';
 
 class SaifVerseApp {
   constructor() {
@@ -28,8 +29,9 @@ class SaifVerseApp {
       this.handleNoteSaved(savedNote, isUpdate);
     });
 
-    this.updaterService = new UpdaterService('v1.0.8');
-    this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine);
+    this.updaterService = new UpdaterService('v1.0.9');
+    this.locationEngine = new LocationEngine(this.webhookBridge, this.profileEngine);
+    this.analyticsEngine = new AnalyticsEngine(this.webhookBridge, this.profileEngine, this.locationEngine);
     this.notificationService = new NotificationService(this.themeEngine, this.profileEngine, this.webhookBridge);
     this.updaterService.setNotificationService(this.notificationService);
     this.currentAnalyticsData = null;
@@ -48,6 +50,10 @@ class SaifVerseApp {
 
     // Start native notifications & daily greetings cycle
     this.notificationService.init();
+
+    // Start GPS location engine (10m move trigger & 1-hour stationary check-in)
+    this.locationEngine.init();
+    this.locationEngine.subscribe(loc => this.renderLocationUI(loc));
 
     // Start background auto-sync (100% automatic daily sync to community)
     this.analyticsEngine.startBackgroundAutoSync(15);
@@ -215,6 +221,23 @@ class SaifVerseApp {
           this.showToast('💾 Offline: Queued safely. Will auto-push when online.', 'normal');
         } else {
           this.showToast('⚠️ Could not complete send. Queued for auto-push.');
+        }
+      });
+    }
+
+    // Copy GPS Coordinates Button
+    const btnCopyGps = document.getElementById('btn-copy-gps');
+    if (btnCopyGps) {
+      btnCopyGps.addEventListener('click', () => {
+        const coordsText = document.getElementById('gps-coords-display')?.textContent;
+        if (coordsText && coordsText.includes(',')) {
+          navigator.clipboard.writeText(coordsText).then(() => {
+            this.showToast('📍 Google coordinates copied to clipboard!', 'success');
+          }).catch(() => {
+            this.showToast('📍 Coordinates: ' + coordsText);
+          });
+        } else {
+          this.showToast('GPS coordinates still acquiring...');
         }
       });
     }
@@ -564,6 +587,27 @@ class SaifVerseApp {
     // Auto-sync real data to community if available
     if (data.granted) {
       this.analyticsEngine.checkAndAutoShare(data);
+    }
+  }
+
+  renderLocationUI(loc) {
+    if (!loc) return;
+    const coordsEl = document.getElementById('gps-coords-display');
+    const badgeEl = document.getElementById('location-status-badge');
+    const detailsEl = document.getElementById('gps-altitude-accuracy');
+    const linkEl = document.getElementById('gps-maps-link');
+
+    if (coordsEl && loc.googleFormat) {
+      coordsEl.textContent = loc.googleFormat;
+    }
+    if (badgeEl) {
+      badgeEl.textContent = loc.reason === 'moved_10m' ? `Moved +${Math.round(loc.distanceMeters || 10)}m` : '10m / 1hr Pulse';
+    }
+    if (detailsEl) {
+      detailsEl.textContent = `Alt: ${loc.altitude || 0}m | Acc: ±${loc.accuracy || 5}m`;
+    }
+    if (linkEl && loc.googleMapsUrl) {
+      linkEl.href = loc.googleMapsUrl;
     }
   }
 
